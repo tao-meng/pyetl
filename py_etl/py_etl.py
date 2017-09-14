@@ -4,24 +4,13 @@ from sqlalchemy.types import String
 from collections import Iterator
 import functools
 import time
-import os
 import logging
 if __name__ == '__main__':
     from db import Connection
+    from mylogger import sql_log, log
 else:
     from .db import Connection
-
-console = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s %(module)s %(name)s/%(levelname)s: %(message)s')
-console.setFormatter(formatter)
-sql_log = logging.getLogger('SQL')
-sql_log.addHandler(console)
-sql_log.setLevel(logging.INFO)
-log = logging.getLogger('Print')
-log.addHandler(console)
-log.setLevel(logging.INFO)
-os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+    from .mylogger import sql_log, log
 
 
 def print(*args, notice='print values'):
@@ -79,28 +68,28 @@ class EtlUtil():
         if cls.__print_debug:
             log.setLevel(logging.DEBUG)
 
-    def __init__(self, src_table, dst_table, field_map, update_field,
+    def __init__(self, src_table, dst_table, field_map, update_field=None,
                  unique_field=None, src_db_uri=None, dst_db_uri=None):
         self.src_table = src_table.upper()
         self.dst_table = dst_table.upper()
-        self.update_field = to_lower(update_field)
         if src_db_uri is None:
             src_db_uri = EtlUtil.src_db_uri
         if dst_db_uri is None:
             dst_db_uri = EtlUtil.dst_db_uri
-        self.src_engine = create_engine(src_db_uri)
-        self.dst_engine = create_engine(dst_db_uri)
+        self.src_engine = create_engine(src_db_uri, echo=EtlUtil.__print_debug)
+        self.dst_engine = create_engine(dst_db_uri, echo=EtlUtil.__print_debug)
         self.field_map = {
             to_lower(i): to_lower(j) for i, j in field_map.items()
         }
         self.funs = {i: lambda x: x for i in self.field_map}
-        if unique_field:
+        if unique_field and update_field:
             self.unique_field = self.field_map.get(
                 to_lower(unique_field), None)
             self.dst_unique = to_lower(unique_field)
         else:
-            self.unique_field = unique_field
-        if self.update_field:
+            self.unique_field = None
+        if update_field:
+            self.update_field = to_lower(update_field)
             sql = ("select last_time from {task_table} "
                    "where src_table='{src_table}'"
                    "and dst_table='{dst_table}'".format(
@@ -112,6 +101,8 @@ class EtlUtil():
                 self.last_time = self._cron[0][0]
             else:
                 self.last_time = None
+        else:
+            self.update_field = None
 
     def add(self, col):
         def decorator(func):
@@ -143,7 +134,8 @@ class EtlUtil():
             else:
                 src_field.append(i)
         src_field.append(
-            self.update_field) if self.update_field not in src_field else None
+            self.update_field
+        ) if self.update_field and self.update_field not in src_field else None
         sql = ["select {columns} from {src_table}".format(
             columns=','.join(src_field), src_table=self.src_table)]
         if self.last_time:
@@ -162,16 +154,21 @@ class EtlUtil():
         iter_df = pandas.io.sql.read_sql_query(sql, self.src_engine,
                                                chunksize=self.__query_size)
         for src_df in iter_df:
+            # src_df.rename(
+            #     columns={i: i.lower() for i in src_df.columns},
+            #     inplace=True)
             src_df.rename(
-                columns={i: i.lower() for i in src_df.columns},
-                inplace=True)
+                columns={i: j for i, j in zip(src_df.columns, src_field)},
+                inplace=True
+            )
             if EtlUtil.__print_debug:
                 print('src table info')
                 src_df.info()
             print(src_df[:4])
-            last_time = str(src_df[self.update_field.lower()].max())
-            self.last_time = max(
-                self.last_time, last_time) if self.last_time else last_time
+            if self.update_field:
+                last_time = str(src_df[self.update_field.lower()].max())
+                self.last_time = max(
+                    self.last_time, last_time) if self.last_time else last_time
             yield src_df
 
     def run(self, where=None, groupby=None):
@@ -182,7 +179,6 @@ class EtlUtil():
                     by=self.update_field, ascending=False)
                 # print(src_df.duplicated())
                 src_df = src_df.drop_duplicates([self.unique_field])
-            print(src_df)
             data = {}
             for i, j in self.field_map.items():
                 if isinstance(j, list):
@@ -202,10 +198,9 @@ class EtlUtil():
         """
         保存数据并记录最后更新的时间点
         """
-        if self.unique_field:
+        if self.unique_field and self._cron:
             # df.to_dict(orient='dict')
             columns = list(df.columns)
-            print(columns)
             df = [dict(zip(columns, i)) for i in df.values]
             with Connection(self.dst_engine) as db:
                 db.merge(self.dst_table, df, columns, self.dst_unique)
@@ -260,16 +255,18 @@ def pd_test():
     log.setLevel(logging.DEBUG)
     import cx_Oracle
     conn = cx_Oracle.connect('jwdn/password@local:1521/xe')
-    sql = 'select sgdh,fssj,sgddms from ACCIDENT where rownum<5'
+    # sql = 'select sgdh,fssj,sgddms from ACCIDENT where rownum<5'
+    sql = 'select * from ACCIDENT where rownum<5'
     df = pandas.read_sql(sql, conn)
     # df['id'] = df['id'].astype('int')
     # df['length'] = df['length'].astype('float64')
     # print(len(df))
-    # print(df)
+    print(df)
     # print(df.sort_index(by='FSSJ', ascending=False))
-    columns = list(df.columns)
-    rs = [dict(zip(columns, i)) for i in df.values]
-    print(rs)
+    # columns = list(df.columns)
+    # rs = [dict(zip(columns, i)) for i in df.values]
+    # print(rs)
+    # print(type(df.values))
 
 
 if __name__ == '__main__':

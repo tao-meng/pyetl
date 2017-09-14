@@ -1,4 +1,3 @@
-
 class TestingConfig:
     DEBUG = True
     SRC_DB_URI = "oracle+cx_oracle://jwdn:password@local:1521/xe"

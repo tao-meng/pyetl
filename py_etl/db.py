@@ -5,7 +5,23 @@ from collections import OrderedDict
 from sqlalchemy import engine
 import re
 import os
+if __name__ == '__main__':
+    from mylogger import log
+else:
+    from .mylogger import log
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+
+
+def print(*args, notice='print values'):
+    log.debug('%s>>>>>>\n%s' % (notice, ' '.join(['%s' % i for i in args])))
+
+
+def reduce_num(n, l):
+    num = min(n, l)
+    if num > 10:
+        return num // 10
+    else:
+        return 1
 
 
 class Connection():
@@ -61,10 +77,11 @@ class Connection():
             批量插入时定义一次插入的数量，默认10000
         """
         try:
+            length = len(args)
             count = 0
             if args and not isinstance(args, dict)\
                     and isinstance(args[0], dict):
-                for i in range(0, len(args), num):
+                for i in range(0, length, num):
                     rs = self.execute(sql, args[i:i + num])
                     count += rs.rowcount
             else:
@@ -84,33 +101,43 @@ class Connection():
                     rs.group(1), rs.group(2), rs.group(3))
                 delta = 2 if len(
                     str(value)) == 1 else 2 * 10**(len(str(value)) - 2)
-                sql_query = "select data_type from user_tab_columns\
-                    where table_name='%s' and column_name='%s'" % (
-                    table_name, column_name)
-                data_type = self.query(sql_query)[0][0]
+                sql_query = ("select data_type,char_used from user_tab_columns"
+                             " where table_name='%s' and column_name='%s'" % (
+                                 table_name, column_name))
+                data_type, char_used = self.query(sql_query)[0]
+                if char_used == 'C':
+                    char_type = 'char'
+                elif char_used == 'B':
+                    char_type = 'byte'
+                else:
+                    char_type = ''
                 sql_modify = ("alter table {table_name} modify({column_name}"
-                              " {data_type}({value}))".format(
+                              " {data_type}({value} {char_type}))".format(
                                   table_name=table_name,
                                   column_name=column_name,
                                   data_type=data_type,
+                                  char_type=char_type,
                                   value=int(value) + delta))
                 self.session.execute(sql_modify)
                 count += self.insert(sql, args, num)
             else:
                 if args and not isinstance(args, dict)\
                         and isinstance(args[0], (tuple, list, dict)):
-                    print('\nSQL EXECUTEMANY ERROR\n', sql)
-                    for i in args[i:i + num][:20]:
-                        print(i)
-                    print('SQL EXECUTEMANY ERROR\n')
-                # if args and isinstance(args[0], (tuple, list)):
-                #     print('\nSQL EXECUTEMANY ERROR\n',
-                #           sql, args[:20],
-                #           '\nSQL EXECUTEMANY ERROR\n')
+                    if num <= 10 or length <= 10:
+                        err_msg = ['\nSQL EXECUTEMANY ERROR\n %s' % sql]
+                        for i in args[i:i + num]:
+                            err_msg.append('\n %s' % i)
+                        err_msg.append('\nSQL EXECUTEMANY ERROR\n')
+                        log.error(''.join(err_msg))
+                    else:
+                        self.insert(
+                            sql, args[i:i + num],
+                            num=reduce_num(num, length))
                 else:
-                    print('\nSQL EXECUTE ERROR\n',
-                          sql, args,
-                          '\nSQL EXECUTE ERROR\n')
+                    log.error(
+                        '\nSQL EXECUTE ERROR\n%s\n%s\nSQL EXECUTE ERROR\n' %
+                        (sql, args)
+                    )
                 raise reason
         return count
 
@@ -134,7 +161,7 @@ class Connection():
                                                t1_columns=t1_columns,
                                                t2_columns=t2_columns))
         print(sql)
-        print(self.insert(sql, args))
+        self.insert(sql, args)
 
     def delete_repeat(self, table, unique, cp_field="rowid"):
         """
@@ -190,12 +217,18 @@ class Connection():
             self.close()
 
 
-if __name__ == "__main__":
+def db_test():
+    import logging
+    log.setLevel(logging.DEBUG)
     db_uri = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    with Connection(db_uri) as db:
+    with Connection(db_uri, echo=True) as db:
         sql = "select * from test where rownum<2"
         print(db.query_dict(sql))
-        # sql = "insert into test(id,foo) values(:id,:foo)"
-        # print(db.insert(sql, {'id': 1111, 'foo': '111111'}))
+        sql = "insert into test(id,foo) values(:id,:bar)"
+        print(db.insert(sql, [{'id': '111', 'bar': '11111111111111111'}]))
         # print(db.delete_repeat('test', 'id', 'dtime'))
-        # db.merge('test', {'foo': '1', 'bh': 2222}, ['foo', 'bh'], 'foo')
+        # db.merge('test', {'foo': '1', 'id': 2222}, ['foo', 'id'], 'foo')
+
+
+if __name__ == "__main__":
+    db_test()

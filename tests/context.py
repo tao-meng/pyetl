@@ -6,3 +6,5 @@ sys.path.insert(
 )
 from py_etl import EtlUtil
 from py_etl import Connection
+from py_etl import transform
+from py_etl import geometry

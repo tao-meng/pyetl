@@ -4,7 +4,7 @@ EtlUtil.config(config['testing'])
 src_table = 'test'
 dst_table = 'work'
 # 表的相关字段映射
-field_map = {'ID': 'bh',
+field_map = {'ID': 'id',
              'fssj': 'dtime',
              'foo': 'foo'}
 update_field = 'dtime'

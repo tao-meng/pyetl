@@ -11,7 +11,7 @@ with open('py_etl/__init__.py', 'rb') as f:
 setup(
     name='py_etl',
     version=version,
-    install_requires=['pandas>=0.20.3', 'SQLAlchemy>=1.0.15'],
+    install_requires=['pandas>=0.19.0', 'SQLAlchemy>=1.0.15'],
     description='python etl frame',
     classifiers=[
         'License :: OSI Approved :: MIT License',
