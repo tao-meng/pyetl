@@ -2,7 +2,7 @@
 """
     A python etl frame based on pandas and sqlalchemy
 """
-__version__ = '1.1.0'
+__version__ = '1.1.2'
 
 __all__ = ['EtlUtil', 'Connection', 'print', 'sql_log', 'log']
 

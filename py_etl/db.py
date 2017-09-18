@@ -138,10 +138,10 @@ class Connection():
                         '\nSQL EXECUTE ERROR\n%s\n%s\nSQL EXECUTE ERROR\n' %
                         (sql, args)
                     )
-                raise reason
+                    raise reason
         return count
 
-    def merge(self, table, args, columns, unique):
+    def merge(self, table, args, columns, unique, num=10000):
         param_columns = ','.join([':{0} as {0}'.format(i) for i in columns])
         update_field = ','.join(
             ['t1.{0}=t2.{0}'.format(i) for i in columns if i != unique])
@@ -161,7 +161,10 @@ class Connection():
                                                t1_columns=t1_columns,
                                                t2_columns=t2_columns))
         print(sql)
-        self.insert(sql, args)
+        # self.execute(sql, args)
+        length = len(args)
+        for i in range(0, length, num):
+            self.execute(sql, args[i:i + num])
 
     def delete_repeat(self, table, unique, cp_field="rowid"):
         """

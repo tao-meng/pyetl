@@ -1,5 +1,11 @@
 py_etl frame based on pandas and sqlalchemy
 
+'1.1.2'
+1.db模块merge方法插入数据方式不依赖于insert方法，直接调用回报insert会报ora-01458，可能与rs.rownum计数有关
+
+'1.1.1'
+1.修改db模块插入数据异常时，使其报错显示最终问题值
+
 '1.1.0'
 1.增加gis模块
 
