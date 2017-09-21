@@ -1,5 +1,8 @@
 py_etl frame based on pandas and sqlalchemy
 
+'1.1.3'
+1.db模块增加odbc方式连接数据库
+
 '1.1.2'
 1.db模块merge方法插入数据方式不依赖于insert方法，直接调用回报insert会报ora-01458，可能与rs.rownum计数有关
 

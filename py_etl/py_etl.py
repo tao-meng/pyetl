@@ -6,10 +6,10 @@ import functools
 import time
 import logging
 if __name__ == '__main__':
-    from db import Connection
+    from db import connection
     from mylogger import sql_log, log
 else:
-    from .db import Connection
+    from .db import connection
     from .mylogger import sql_log, log
 
 
@@ -202,7 +202,7 @@ class EtlUtil():
             # df.to_dict(orient='dict')
             columns = list(df.columns)
             df = [dict(zip(columns, i)) for i in df.values]
-            with Connection(self.dst_engine) as db:
+            with connection(self.dst_engine) as db:
                 db.merge(self.dst_table, df, columns, self.dst_unique)
         else:
             df.to_sql(self.dst_table.lower(), self.dst_engine,

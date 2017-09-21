@@ -1,15 +1,37 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import DatabaseError
+# -*- coding: utf-8 -*-
 from collections import OrderedDict
-from sqlalchemy import engine
-import re
+from pyodbc import DatabaseError
+import pyodbc
 import os
+import re
 if __name__ == '__main__':
+    import sys
+    sys.path.insert(
+        0,
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    )
     from mylogger import log
 else:
-    from .mylogger import log
+    from ..mylogger import log
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
+
+
+def str_sql(field, split_str=','):
+    """
+    >>> str_sql(['id','name'])
+    'id,name'
+    >>> str_sql(['id','name'],split_str=';')
+    'id;name'
+    """
+    return split_str.join(field)
+
+
+def args_sql(field):
+    """
+    >>> args_sql(['id','name'])
+    ':1,:1'
+    """
+    return ','.join([':1' for i in range(len(field))])
 
 
 def print(*args, notice='print values'):
@@ -29,35 +51,39 @@ class Connection():
     def __init__(self, con, echo=False):
         """
         >>>con
-        "oracle+cx_oracle://jwdn:password@192.168.152.1:1521/xe"
+        "DSN=mpp_dsn"
         """
-        self._eng = con if isinstance(
-            con, engine.base.Engine) else create_engine(con, echo=echo)
-        self.session = self.create_session()
+        self.connect = pyodbc.connect(con)
+        self.cursor = self.connect.cursor()
 
-    def create_session(self):
-        DB_Session = sessionmaker(bind=self._eng)
-        return DB_Session()
-
-    def execute(self, sql, args=None):
+    def execute(self, sql, *args):
         """
         执行sql
         """
-        return self.session.execute(sql, args)
+        if args:
+            return self.cursor.execute(sql, *args)
+        else:
+            return self.cursor.execute(sql)
 
-    def query(self, sql, args=None):
+    def query(self, sql, args=[]):
         """
         查询返回元祖数据集(clob对象转对应字符串)
+        self.query(
+            'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
+            10)
         """
-        rs = self.execute(sql).fetchall()
+        rs = self.execute(sql, *args).fetchall()
         return rs
 
-    def query_dict(self, sql, args=None):
+    def query_dict(self, sql, args=[]):
         """
         查询返回字典数据集
+        self.query(
+            'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
+            10)
         """
-        rs = self.execute(sql)
-        colunms = [i[0] for i in rs._cursor_description()]
+        rs = self.execute(sql, *args)
+        colunms = [i[0] for i in self.cursor.description]
         return [OrderedDict(zip(colunms, i)) for i in rs.fetchall()]
 
     def insert(self, sql, args, num=10000):
@@ -80,7 +106,7 @@ class Connection():
             length = len(args)
             count = 0
             if args and not isinstance(args, dict)\
-                    and isinstance(args[0], dict):
+                    and isinstance(args[0], list, dict):
                 for i in range(0, length, num):
                     rs = self.execute(sql, args[i:i + num])
                     count += rs.rowcount
@@ -118,7 +144,7 @@ class Connection():
                                   data_type=data_type,
                                   char_type=char_type,
                                   value=int(value) + delta))
-                self.session.execute(sql_modify)
+                self.execute(sql_modify)
                 count += self.insert(sql, args, num)
             else:
                 if args and not isinstance(args, dict)\
@@ -161,10 +187,10 @@ class Connection():
                                                t1_columns=t1_columns,
                                                t2_columns=t2_columns))
         print(sql)
-        # self.execute(sql, args)
-        length = len(args)
-        for i in range(0, length, num):
-            self.execute(sql, args[i:i + num])
+        self.execute(sql, args)
+        # length = len(args)
+        # for i in range(0, length, num):
+        #     self.execute(sql, args[i:i + num])
 
     def delete_repeat(self, table, unique, cp_field="rowid"):
         """
@@ -193,19 +219,20 @@ class Connection():
         """
         数据回滚
         """
-        self.session.rollback()
+        self.connect.rollback()
 
     def commit(self):
         """
         提交
         """
-        self.session.commit()
+        self.connect.commit()
 
     def close(self):
         """
         关闭数据库连接
         """
-        self.session.close()
+        self.cursor.close()
+        self.connect.close()
 
     def __enter__(self):
         return self
@@ -220,18 +247,9 @@ class Connection():
             self.close()
 
 
-def db_test():
-    import logging
-    log.setLevel(logging.DEBUG)
-    db_uri = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    with Connection(db_uri, echo=True) as db:
-        sql = "select * from test where rownum<2"
-        print(db.query_dict(sql))
-        sql = "insert into test(id,foo) values(:id,:bar)"
-        print(db.insert(sql, [{'id': '111', 'bar': '11111111111111111'}]))
-        # print(db.delete_repeat('test', 'id', 'dtime'))
-        # db.merge('test', {'foo': '1', 'id': 2222}, ['foo', 'id'], 'foo')
-
-
-if __name__ == "__main__":
-    db_test()
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
+    sql = "SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit 2"
+    with Connection("DSN=mpp_dsn") as db:
+        print(db.query(sql))

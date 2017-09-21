@@ -2,10 +2,10 @@
 """
     A python etl frame based on pandas and sqlalchemy
 """
-__version__ = '1.1.2'
+__version__ = '1.1.3'
 
-__all__ = ['EtlUtil', 'Connection', 'print', 'sql_log', 'log']
+__all__ = ['EtlUtil', 'connection', 'log']
 
-from .db import Connection
+from .db import connection
 from .py_etl import EtlUtil
-from .mylogger import sql_log, log
+from .mylogger import log
