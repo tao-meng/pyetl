@@ -104,15 +104,12 @@ class Connection():
         """
         try:
             length = len(args)
-            count = 0
             if args and not isinstance(args, dict)\
-                    and isinstance(args[0], list, dict):
+                    and isinstance(args[0], (tuple, list, dict)):
                 for i in range(0, length, num):
-                    rs = self.execute(sql, args[i:i + num])
-                    count += rs.rowcount
+                    self.cursor.executemany(sql, args[i:i + num])
             else:
                 rs = self.execute(sql, args)
-                count = rs.rowcount
         except DatabaseError as reason:
             self.rollback()
             # match_name = re.compile('(?:into|update) +(\S+)')
@@ -145,7 +142,7 @@ class Connection():
                                   char_type=char_type,
                                   value=int(value) + delta))
                 self.execute(sql_modify)
-                count += self.insert(sql, args, num)
+                self.insert(sql, args, num)
             else:
                 if args and not isinstance(args, dict)\
                         and isinstance(args[0], (tuple, list, dict)):
@@ -155,6 +152,7 @@ class Connection():
                             err_msg.append('\n %s' % i)
                         err_msg.append('\nSQL EXECUTEMANY ERROR\n')
                         log.error(''.join(err_msg))
+                        raise reason
                     else:
                         self.insert(
                             sql, args[i:i + num],
@@ -165,7 +163,6 @@ class Connection():
                         (sql, args)
                     )
                     raise reason
-        return count
 
     def merge(self, table, args, columns, unique, num=10000):
         param_columns = ','.join([':{0} as {0}'.format(i) for i in columns])

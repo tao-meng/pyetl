@@ -134,6 +134,7 @@ class Connection():
                             err_msg.append('\n %s' % i)
                         err_msg.append('\nSQL EXECUTEMANY ERROR\n')
                         log.error(''.join(err_msg))
+                        raise reason
                     else:
                         self.insert(
                             sql, args[i:i + num],
