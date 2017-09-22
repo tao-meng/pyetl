@@ -56,33 +56,33 @@ class Connection():
         self.connect = pyodbc.connect(con)
         self.cursor = self.connect.cursor()
 
-    def execute(self, sql, *args):
+    def execute(self, sql, args=None):
         """
         执行sql
         """
         if args:
-            return self.cursor.execute(sql, *args)
+            return self.cursor.execute(sql, args)
         else:
             return self.cursor.execute(sql)
 
-    def query(self, sql, args=[]):
+    def query(self, sql, args=None):
         """
         查询返回元祖数据集(clob对象转对应字符串)
         self.query(
             'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
             10)
         """
-        rs = self.execute(sql, *args).fetchall()
+        rs = self.execute(sql, args).fetchall()
         return rs
 
-    def query_dict(self, sql, args=[]):
+    def query_dict(self, sql, args=None):
         """
         查询返回字典数据集
         self.query(
             'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
             10)
         """
-        rs = self.execute(sql, *args)
+        rs = self.execute(sql, args)
         colunms = [i[0] for i in self.cursor.description]
         return [OrderedDict(zip(colunms, i)) for i in rs.fetchall()]
 
