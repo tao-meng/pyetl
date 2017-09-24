@@ -2,15 +2,13 @@
 """
     db connection
 """
-__version__ = '1.1.2'
-
 __all__ = ['connection']
 
 from . import odbc_db
 from . import sqlalchemy_db
 
 
-def connection(uri):
+def connection(uri='DSN=mpp_dsn'):
     if uri.startswith('DSN'):
         return odbc_db.Connection(uri)
     elif '://' in uri:

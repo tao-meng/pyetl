@@ -51,7 +51,7 @@ class Connection():
     def __init__(self, con, echo=False):
         """
         >>>con
-        "DSN=mpp_dsn"
+        'DSN=mpp_dsn'
         """
         self.connect = pyodbc.connect(con)
         self.cursor = self.connect.cursor()
