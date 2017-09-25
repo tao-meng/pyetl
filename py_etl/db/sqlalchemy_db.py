@@ -230,11 +230,19 @@ def db_test():
     import logging
     log.setLevel(logging.DEBUG)
     db_uri = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    with Connection(db_uri, echo=True) as db:
-        sql = "select * from test where rownum<2"
-        print(db.query_dict(sql))
-    #     sql = "insert into test(id,foo) values(:id,:bar)"
-    #     print(db.insert(sql, [{'id': '111', 'bar': '11111111111111111'}]))
+    db = create_engine(db_uri)
+    sql = "select * from test where rownum<2"
+    rs = db.execute(sql)
+    sql = "insert into test(id,foo) values(:1,:2)"
+    print(dir(rs))
+    db.execute(sql,['2222','123123'])
+    print(dir(db))
+    # with Connection(db_uri, echo=True) as db:
+    #     # sql = "select * from test where rownum<2"
+    #     # print(db.query_dict(sql))
+    #     sql = "insert into test(id,foo) values(:1,:2)"
+    #     print(db.insert(sql,'111','11111111111111111'))
+        # print(db.insert(sql,{'1':'111','2':'11111111111111111'}))
         # print(db.delete_repeat('test', 'id', 'dtime'))
         # db.merge('test', {'foo': '1', 'id': 2222}, ['foo', 'id'], 'foo')
 

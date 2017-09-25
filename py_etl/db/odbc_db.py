@@ -34,8 +34,8 @@ def args_sql(field):
     return ','.join([':1' for i in range(len(field))])
 
 
-def print(*args, notice='print values'):
-    log.debug('%s>>>>>>\n%s' % (notice, ' '.join(['%s' % i for i in args])))
+def print(*args, notice=''):
+    log.debug('%s\n%s' % (notice, ' '.join(['%s' % i for i in args])))
 
 
 def reduce_num(n, l):
@@ -53,6 +53,7 @@ class Connection():
         >>>con
         'DSN=mpp_dsn'
         """
+        print(self.__class__.__module__)
         self.connect = pyodbc.connect(con)
         self.cursor = self.connect.cursor()
 
@@ -60,22 +61,41 @@ class Connection():
         """
         执行sql
         """
+        sql = sql.replace(':1', '?')
+        log.debug(sql)
+        log.debug(args)
         if args:
             return self.cursor.execute(sql, args)
         else:
             return self.cursor.execute(sql)
 
-    def query(self, sql, args=None):
+    def _query_generator(self, sql, args, chunksize):
         """
         查询返回元祖数据集(clob对象转对应字符串)
         self.query(
             'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
             10)
         """
-        rs = self.execute(sql, args).fetchall()
-        return rs
+        rs = self.execute(sql, args)
+        res = rs.fetchmany(chunksize)
+        while res:
+            yield res
+            res = rs.fetchmany(chunksize)
 
-    def query_dict(self, sql, args=None):
+    def query(self, sql, args=None, chunksize=None):
+        """
+        查询返回元祖数据集(clob对象转对应字符串)
+        self.query(
+            'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
+            10)
+        """
+        if chunksize is None:
+            rs = self.execute(sql, args).fetchall()
+            return rs
+        else:
+            return self._query_generator(sql, args, chunksize)
+
+    def _query_like_pandas_dataframe(self, sql, args, chunksize):
         """
         查询返回字典数据集
         self.query(
@@ -84,7 +104,29 @@ class Connection():
         """
         rs = self.execute(sql, args)
         colunms = [i[0] for i in self.cursor.description]
-        return [OrderedDict(zip(colunms, i)) for i in rs.fetchall()]
+        res = rs.fetchmany(chunksize)
+        while res:
+            # dataframe = []
+            # for i, j in enumerate(colunms):
+            #     dataframe.append((j, list(map(lambda x: x[i], res))))
+            dataframe = list(zip(colunms, zip(*res)))
+            print(dataframe)
+            yield dataframe
+            res = rs.fetchmany(chunksize)
+
+    def query_dict(self, sql, args=None, chunksize=None):
+        """
+        查询返回字典数据集
+        self.query(
+            'SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit ?',
+            10)
+        """
+        if chunksize is None:
+            rs = self.execute(sql, args)
+            colunms = [i[0] for i in self.cursor.description]
+            return [OrderedDict(zip(colunms, i)) for i in rs.fetchall()]
+        else:
+            return self._query_like_pandas_dataframe(sql, args, chunksize)
 
     def insert(self, sql, args, num=10000):
         """
@@ -244,9 +286,17 @@ class Connection():
             self.close()
 
 
+def ModTest():
+    import logging, datetime
+    log.setLevel(logging.DEBUG)
+    # sql = "SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit 2"
+    # with Connection("DSN=mpp_dsn") as db:
+    #     print(db.query(sql))
+    sql = "SELECT * FROM TEST where dtime>?"
+    with Connection('DSN=mydb;UID=root;PWD=password') as db:
+        res = db.query(sql, [datetime.datetime(2017, 9, 20)])
+        print((res))
+
+
 if __name__ == '__main__':
-    import doctest
-    doctest.testmod()
-    sql = "SELECT * FROM oview.view_zz_jjjw_vw_accident_veh_rel limit 2"
-    with Connection("DSN=mpp_dsn") as db:
-        print(db.query(sql))
+    ModTest()
