@@ -1,5 +1,8 @@
 py_etl frame based on pandas and sqlalchemy
 
+'1.1.4'
+1.数据源支持非sqlalchemy engine, 支持普通db适配器连接方式
+
 '1.1.3'
 1.db模块增加odbc方式连接数据库
 
