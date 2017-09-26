@@ -48,6 +48,16 @@ class Connection():
         """
         执行sql
         """
+        if ':1' in sql:
+            num = sql.count(':1')
+            sql = sql.replace(':1', '%s') % tuple(
+                [':%s' % i for i in range(num)]
+            )
+            keys = [str(i) for i in range(num)]
+            if isinstance(args[0], (list, tuple)):
+                args = [dict(zip(keys, i)) for i in args]
+            else:
+                args = dict(zip(keys, args))
         return self.session.execute(sql, args)
 
     def query(self, sql, args=None):
@@ -230,19 +240,11 @@ def db_test():
     import logging
     log.setLevel(logging.DEBUG)
     db_uri = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    db = create_engine(db_uri)
-    sql = "select * from test where rownum<2"
-    rs = db.execute(sql)
-    sql = "insert into test(id,foo) values(:1,:2)"
-    print(dir(rs))
-    db.execute(sql,['2222','123123'])
-    print(dir(db))
-    # with Connection(db_uri, echo=True) as db:
-    #     # sql = "select * from test where rownum<2"
-    #     # print(db.query_dict(sql))
-    #     sql = "insert into test(id,foo) values(:1,:2)"
-    #     print(db.insert(sql,'111','11111111111111111'))
-        # print(db.insert(sql,{'1':'111','2':'11111111111111111'}))
+    with Connection(db_uri, echo=True) as db:
+        sql = "insert into test(foo,bar) values(:1,:1)"
+        print(db.insert(sql, [('aaa', 'bbb'), ('aaa', 'bbb'), ('aaa', 'bbb')]))
+        sql = "insert into test(foo,bar) values(:a,:b)"
+        print(db.insert(sql, {'a': 'AAA', 'b': 'BBB'}))
         # print(db.delete_repeat('test', 'id', 'dtime'))
         # db.merge('test', {'foo': '1', 'id': 2222}, ['foo', 'id'], 'foo')
 

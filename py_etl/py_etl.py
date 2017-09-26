@@ -8,10 +8,10 @@ import time
 import logging
 if __name__ == '__main__':
     from db import connection
-    from mylogger import sql_log, log
+    from mylogger import log
 else:
     from .db import connection
-    from .mylogger import sql_log, log
+    from .mylogger import log
 
 
 def print(*args, notice=''):
@@ -178,10 +178,9 @@ class EtlUtil():
             sql.append('group by')
             sql.append(groupby)
         sql = ' '.join(sql)
-        # sql_log.info(sql)
         return sql, args
 
-    def generate_df(self, sql, args):
+    def generate_dataframe(self, sql, args):
         """
         获取源数据
         """
@@ -207,7 +206,7 @@ class EtlUtil():
             yield src_df
 
     def run(self, where=None, groupby=None):
-        iter_df = self.generate_df(*self.handle_sql(where, groupby))
+        iter_df = self.generate_dataframe(*self.handle_sql(where, groupby))
         for src_df in iter_df:
             if self.unique_field:
                 src_df = src_df.sort_index(
@@ -228,6 +227,28 @@ class EtlUtil():
                 dst_df.info()
             print(dst_df[:4])
             yield dst_df
+
+    @run_time
+    def join(self, *args, on=''):
+        """
+        合并数据入库
+        """
+        flag = None
+        if len(args) == 1:
+            for df in args[0]:
+                flag = True
+                self.to_save(df)
+            else:
+                log.info('没有数据更新') if flag is None else None
+        else:
+            args = map(next, args) if isinstance(args[0], Iterator) else args
+            if len(args) == 2:
+                rs = pandas.merge(*args, on=on, how='outer')
+                self.to_save(rs)
+            else:
+                rs = pandas.merge(args[0], args[1], on=on, how='outer')
+                new_args = (rs,) + args[2:]
+                self.join(*new_args, on=on)
 
     def to_save(self, df):
         """
@@ -261,25 +282,3 @@ class EtlUtil():
                 self.last_time,
                 self.src_table,
                 self.dst_table)
-
-    @run_time
-    def join(self, *args, on=''):
-        """
-        合并数据入库
-        """
-        flag = None
-        if len(args) == 1:
-            for df in args[0]:
-                flag = True
-                self.to_save(df)
-            else:
-                log.info('没有数据更新') if flag is None else None
-        else:
-            args = map(next, args) if isinstance(args[0], Iterator) else args
-            if len(args) == 2:
-                rs = pandas.merge(*args, on=on, how='outer')
-                self.to_save(rs)
-            else:
-                rs = pandas.merge(args[0], args[1], on=on, how='outer')
-                new_args = (rs,) + args[2:]
-                self.join(*new_args, on=on)
