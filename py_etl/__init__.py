@@ -7,5 +7,5 @@ __version__ = '1.1.4'
 __all__ = ['EtlUtil', 'connection', 'log']
 
 from .db import connection
-from .py_etl import EtlUtil
+from .app import EtlUtil
 from .mylogger import log

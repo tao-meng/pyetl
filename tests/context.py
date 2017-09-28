@@ -39,12 +39,15 @@ def db_test():
 
 def pandas_test():
     import pandas
-    import cx_Oracle
+    # import cx_Oracle
+    # conn = cx_Oracle.connect('jwdn/password@local:1521/xe')
     import datetime
-    conn = cx_Oracle.connect('jwdn/password@local:1521/xe')
+    from sqlalchemy import create_engine
+    eng = create_engine(
+        "oracle+cx_oracle://jwdn:password@local:1521/xe", echo=True)
     # sql = 'select sgdh,fssj,sgddms from ACCIDENT where rownum<5'
-    sql = 'SELECT * FROM TEST where dtime>:1'
-    df = pandas.read_sql(sql, conn, params=[datetime.datetime(2017, 9, 20)])
+    sql = 'SELECT * FROM ETL_TEST_SRC where dtime>:1'
+    df = pandas.read_sql(sql, eng, params=[datetime.datetime(2017, 9, 20)])
     # df['id'] = df['id'].astype('int')
     # df['length'] = df['length'].astype('float64')
     # print(len(df))
