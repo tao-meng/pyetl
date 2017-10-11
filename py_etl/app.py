@@ -130,6 +130,7 @@ class EtlUtil():
         if engine is None:
             engine = cls.dst_db_uri
         with connection(engine) as db:
+            log.info(engine)
             res = db.query(sql)
         return res
 
@@ -193,9 +194,9 @@ class EtlUtil():
                     },
                     inplace=True
                 )
-            if EtlUtil.__print_debug:
-                print('src table info')
-                src_df.info()
+            # if EtlUtil.__print_debug:
+            #     print('src table info')
+            #     src_df.info()
             print(src_df[:4])
             if self.update_field:
                 last_time = src_df[self.update_field.lower()].max()
@@ -222,9 +223,9 @@ class EtlUtil():
                 else:
                     data[i] = src_df[j].map(self.funs[i])
             dst_df = pandas.DataFrame(data)
-            if EtlUtil.__print_debug:
-                print('dst table info')
-                dst_df.info()
+            # if EtlUtil.__print_debug:
+            #     print('dst table info')
+            #     dst_df.info()
             print(dst_df[:4])
             yield dst_df
 
