@@ -8,4 +8,4 @@ __all__ = ['EtlUtil', 'connection', 'log']
 
 from .db import connection
 from .app import EtlUtil
-from .mylogger import log
+from .log import log

@@ -1,17 +1,13 @@
-import pandas
 from sqlalchemy import create_engine
 from sqlalchemy.types import String
 from sqlalchemy import engine
 from collections import Iterator
+import pandas
 import functools
 import time
 import logging
-if __name__ == '__main__':
-    from db import connection
-    from mylogger import log
-else:
-    from .db import connection
-    from .mylogger import log
+from py_etl.db import connection
+from py_etl.mylogger import log
 
 
 def print(*args, notice=''):

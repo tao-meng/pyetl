@@ -12,7 +12,7 @@ if __name__ == '__main__':
     )
     from mylogger import log
 else:
-    from ..mylogger import log
+    from py_etl.mylogger import log
 os.environ['NLS_LANG'] = 'SIMPLIFIED CHINESE_CHINA.UTF8'
 
 
