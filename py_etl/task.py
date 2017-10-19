@@ -1,4 +1,23 @@
 from py_db import connection
+import datetime
+
+
+# class taskUtil(base.Connection):
+
+#     def __init__(self):
+#         super().__init__()
+
+#     def query(self, src_table, dst_table):
+#         sql = ("select last_time from {task_table} "
+#                "where src_table='{src_table}'"
+#                "and dst_table='{dst_table}'".format(
+#                    src_table=src_table,
+#                    dst_table=dst_table))
+#         return self.insert(sql)
+
+
+# if __name__ == "__main__":
+#     db = taskUtil("task.db", driver="sqlite3")
 
 
 class TaskConfig(object):
@@ -23,7 +42,7 @@ class TaskConfig(object):
                " last_time DATETIME)") % self.task_table
         self.db.insert(sql)
 
-    def append(self, last_time):
+    def append(self, last_time=None):
         id = self.src_table + "_" + self.dst_table
         self.db.insert(
             "insert into %s(id,last_time,src_table,dst_table) "
@@ -32,7 +51,7 @@ class TaskConfig(object):
         )
         self.db.commit()
 
-    def modify(self, last_time):
+    def update(self, last_time):
         self.db.insert(
             "update %s set last_time=:1 "
             "where src_table=:1 and dst_table=:1" % self.task_table,
@@ -40,19 +59,19 @@ class TaskConfig(object):
         )
         self.db.commit()
 
-    def check(self):
+    def query(self):
         res = self.db.query(
-            "select last_time from {task_table} "
+            "select 1, last_time from {task_table} "
             "where src_table='{src_table}'"
             "and dst_table='{dst_table}'".format(
                 task_table=self.task_table,
                 src_table=self.src_table,
                 dst_table=self.dst_table))
-        return res
+        dt = datetime.datetime.strptime(res[1], '%Y%m%d')
+        return res[0], dt
 
 
 if __name__ == "__main__":
-    import datetime
     job = TaskConfig("tab1", "tab2")
     # job.append(datetime.datetime(2017, 9, 12).__str__())
     job.modify(datetime.datetime(2017, 10, 19, 14, 34).__str__())
