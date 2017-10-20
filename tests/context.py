@@ -1,4 +1,3 @@
-__all__ = ['EtlUtil', 'connection', 'transform', 'geometry']
 import os
 import sys
 sys.path.insert(
@@ -22,16 +21,6 @@ def eng_test():
     session = DB_Session()
     session.execute("insert into test(id) values(:id)", [{'id': 5555}])
     session.commit()
-
-
-def db_test():
-    # SRC_DB_URI = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    SRC_DB_URI = 'DSN=mydb;UID=root;PWD=password'
-    with connection(SRC_DB_URI) as db:
-        sql = "insert into test(id,name) values(?,?)"
-        db.insert(sql, [1235123, 'tom'])
-        rs = db.query_dict('select * from test')
-        print(rs)
 
 
 def pandas_test():

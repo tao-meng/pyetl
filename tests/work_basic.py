@@ -4,14 +4,14 @@ from config import config
 
 def job1():
     Etl.config(config['testing1'])
-    src_table = 'test'
-    dst_table = 'work'
-    field_map = {'ID': 'id',
-                 'fssj': 'dtime',
-                 'foo': 'foo'}
-    update_field = 'dtime'
-    unique_field = 'ID'
-    job = Etl(src_table, dst_table, field_map, update_field, unique_field)
+    src_tab = 'test'
+    dst_tab = 'work'
+    mapping = {'ID': 'id',
+               'fssj': 'dtime',
+               'foo': 'foo'}
+    update = 'dtime'
+    unique = 'ID'
+    job = Etl(src_tab, dst_tab, mapping, update, unique)
 
     # @job.add('ZB')
     # def f1(x):
