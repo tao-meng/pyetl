@@ -1,7 +1,8 @@
 class Testing1Config:
     DEBUG = True
-    SRC_DB_URI = "DSN=mydb;UID=root;PWD=password"
-    DST_DB_URI = "oracle+cx_oracle://jwdn:password@local:1521/xe"
+    SRC_URI = "DSN=mydb;UID=root;PWD=password"
+    # SRC_DB_URI = "oracle://jwdn:password@local:1521/xe"
+    DST_URI = "oracle://jwdn:password@local:1521/xe"
     # TASK_TABLE = 'py_script_task'
     # QUERY_SIZE = 2000000
     # INSERT_SIZE = 200000
@@ -10,8 +11,10 @@ class Testing1Config:
 
 class Testing2Config:
     DEBUG = True
-    SRC_DB_URI = "oracle+cx_oracle://jwdn:password@local:1521/xe"
-    DST_DB_URI = "oracle+cx_oracle://jwdn:password@local:1521/xe"
+    # SRC_URI = "oracle://jwdn:password@local:1521/xe"
+    # DST_URI = "oracle://jwdn:password@local:1521/xe"
+    SRC_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
+    DST_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
 
 
 class DevelopmentConfig:

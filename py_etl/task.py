@@ -1,5 +1,5 @@
 from py_db import connection
-import datetime
+from dateutil.parser import parse
 
 
 # class taskUtil(base.Connection):
@@ -41,6 +41,7 @@ class TaskConfig(object):
                " dst_table varchar(100),"
                " last_time DATETIME)") % self.task_table
         self.db.insert(sql)
+        self.db.insert("delete from %s" % self.task_table)
 
     def append(self, last_time=None):
         id = self.src_table + "_" + self.dst_table
@@ -67,13 +68,16 @@ class TaskConfig(object):
                 task_table=self.task_table,
                 src_table=self.src_table,
                 dst_table=self.dst_table))
-        dt = datetime.datetime.strptime(res[1], '%Y%m%d')
-        return res[0], dt
+        if res:
+            dt = parse(res[0][1]) if res[0][1] else res[0][1]
+            return res[0], dt
+        else:
+            return (None, None)
 
 
 if __name__ == "__main__":
     job = TaskConfig("tab1", "tab2")
     # job.append(datetime.datetime(2017, 9, 12).__str__())
-    job.modify(datetime.datetime(2017, 10, 19, 14, 34).__str__())
-    rs = job.check()
+    # job.modify(datetime.datetime(2017, 10, 19, 14, 34).__str__())
+    rs = job.query()
     print(rs)

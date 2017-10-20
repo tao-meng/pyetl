@@ -4,12 +4,12 @@ from py_db import connection
 import pandas
 import functools
 import logging
-from py_etl.utils import run_time
 from py_etl.log import log
-from py_etl.utils import taskUtil
+from py_etl.utils import run_time
+from py_etl.task import TaskConfig
 
 
-def lower(x):
+def upper(x):
     """
     输入中的元素转小写
     >>> to_lower('ABC')
@@ -18,9 +18,9 @@ def lower(x):
     ['abc', 'cde']
     """
     if isinstance(x, list):
-        return [i.lower() for i in x]
+        return [i.upper() for i in x]
     else:
-        return x.lower()
+        return x.upper()
 
 
 class Etl(object):
@@ -28,7 +28,7 @@ class Etl(object):
     _query_size = 2000000
     _insert_size = 200000
     _field_default_size = 200
-    _print_debug = False
+    _debug = False
     _symbol = ":1"
 
     @classmethod
@@ -49,51 +49,58 @@ class Etl(object):
         if isinstance(uri, str):
             return connection(uri, debug=self._debug)
         else:
-            args = uri.pop('uri', ())
+            args = [uri.pop('uri', ())]
             return connection(*args, **uri, debug=self._debug)
 
     def _create_obj(self, src_uri, dst_uri):
-        src_uri = Etl.src_uri if src_uri is None else None
-        dst_uri = Etl.dst_uri if dst_uri is None else None
+        src_uri = Etl.src_uri if src_uri is None else src_uri
+        dst_uri = Etl.dst_uri if dst_uri is None else dst_uri
         return self._connect(src_uri), self._connect(dst_uri)
 
     def _handle_field(self):
         self.src_field = []
         self.src_field_name = []
-        # self.new_map = {}
         for i, j in self.mapping.items():
             if isinstance(j, list):
                 self.src_field_name.extend(j)
                 self.src_field.extend(
                     ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
-                self.mapping[i] = ["{}{}".format(i, n) for n, m in enumerate(j)]
+                self.mapping[i] = [
+                    "{}{}".format(i, n) for n, m in enumerate(j)]
             else:
                 self.src_field_name.append(j)
                 self.src_field.append("{} as {}".format(j, i))
                 self.mapping[i] = i
-        if self.update and self.update not in self.src_field_name:
+        if self.update:
+            self.update_old = self.update
+            if self.update not in self.src_field_name:
                 self.src_field.append(self.update)
+            else:
+                self.update = [
+                    i.split(" as ") for i in self.src_field if self.update in i
+                ][0][1]
 
     def __init__(self, src_tab, dst_tab, mapping, update=None,
                  unique=None, src_uri=None, dst_uri=None):
         self.src_tab = src_tab
         self.dst_tab = dst_tab
-        self.task = taskUtil(self.src_tab, self.dst_tab)
-        # self.src_tab = src_tab.lower()
-        # self.dst_tab = dst_tab.lower()
+        self.task = TaskConfig(self.src_tab, self.dst_tab)
         self.src_obj, self.dst_obj = self._create_obj(src_uri, dst_uri)
-        self.mapping = {lower(i): lower(j) for i, j in mapping.items()}
+        self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
         self.funs = {i: lambda x: x for i in self.mapping}
 
         if unique and update:
-            # self.unique = self.mapping.get(lower(unique), None)
-            self.unique = lower(unique)
+            if upper(unique) in self.mapping:
+                self.unique = upper(unique)
+            else:
+                log.warn("unique：%s 名称错误" % self.unique)
+                self.unique = None
         else:
             self.unique = None
 
         if update:
-            self.update = lower(update)
-            self.job, self.last_time = self.task.query()[0]
+            self.update = upper(update)
+            self.job, self.last_time = self.task.query()
         else:
             self.update = None
         self._handle_field()
@@ -103,48 +110,16 @@ class Etl(object):
             @functools.wraps(func)
             def wrapper(*args, **kw):
                 return func(*args, **kw)
-            self.funs[col.lower()] = func
+            self.funs[col.upper()] = func
             return wrapper
         return decorator
-
-    # @classmethod
-    # def query(cls, sql, engine=None):
-    #     """
-    #     sql查询操作
-    #     """
-    #     if engine is None:
-    #         engine = cls.dst_db_uri
-    #     with connection(engine) as db:
-    #         log.info(engine)
-    #         res = db.query(sql)
-    #     return res
-
-    # def _query_data_generator(self, sql, args):
-    #     with connection(self.src_engine) as db:
-    #         res = db.query_dict(sql, args, chunksize=self.__query_size)
-    #         for r in res:
-    #             data = {}
-    #             for i, d in r:
-    #                 data[i] = pandas.Series(d)
-    #             rs = pandas.DataFrame(data)
-    #             yield rs
-
-    # def query_data(self, sql, args):
-    #     if isinstance(self.src_engine, engine.base.Engine):
-    #         iter_df = pandas.io.sql.read_sql_query(
-    #             sql, self.src_engine,
-    #             params=args,
-    #             chunksize=self.__query_size)
-    #         return iter_df
-    #     else:
-    #         return self._query_data_generator(sql, args)
 
     def generate_sql(self, where, groupby):
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
 
         if self.last_time:
-            sql.append("where %s>%s" % (self.update, self._symbol))
+            sql.append("where %s>%s" % (self.update_old, self._symbol))
             args = [self.last_time]
             if where:
                 sql.append('and (%s)' % where)
@@ -167,31 +142,36 @@ class Etl(object):
             params=args,
             chunksize=self._query_size)
         return df_iterator
-        # for src_df in df_iterator:
-        #     yield src_df
+
+    def _handle_data(self, src_df):
+        if self.unique:
+            df_sorted = src_df.sort_values(by=self.update, ascending=False)
+            # print(df_sorted)
+            src_df = df_sorted.drop_duplicates([self.unique])
+            # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
+            # print(df_drop)
+        data = {}
+        for i, j in self.mapping.items():
+            if isinstance(j, list):
+                merge_arr = map(list, zip(*[src_df[x] for x in j]))
+                data[i] = pandas.Series(merge_arr).map(self.funs[i])
+            else:
+                data[i] = src_df[i].map(self.funs[i])
+        dst_df = pandas.DataFrame(data)
+        return dst_df
 
     def run(self, where=None, groupby=None):
-        df_iterator = self.generate_dataframe(*self.generate_sql(where, groupby))
+        sql, args = self.generate_sql(where, groupby)
+        df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
             if self.update:
                 last_time = src_df[self.update].max()
-                self.last_time = max(self.last_time, last_time) if self.last_time else last_time
-            if self.unique:
-                src_df = src_df.sort_index(by=self.update, ascending=False)
-                # print(src_df.duplicated())
-                src_df = src_df.drop_duplicates([self.unique])
-            data = {}
-            for i, j in self.mapping.items():
-                if isinstance(j, list):
-                    merge_colume = map(list, zip(*[src_df[x] for x in j]))
-                    data[i] = pandas.Series(merge_colume).map(self.funs[i])
-                else:
-                    data[i] = src_df[j].map(self.funs[i])
-            dst_df = pandas.DataFrame(data)
-            # if self.__print_debug:
-            #     print('dst table info')
+                self.last_time = max(self.last_time, last_time
+                                     ) if self.last_time else last_time
+            dst_df = self._handle_data(src_df)
+            # if self._debug:
             #     dst_df.info()
-            print(dst_df[:4])
+            # print(dst_df)
             yield dst_df
 
     @run_time
@@ -203,33 +183,41 @@ class Etl(object):
         if len(args) == 1:
             for df in args[0]:
                 flag = True
-                self.to_save(df)
+                self._to_save(df)
             else:
                 log.info('没有数据更新') if flag is None else None
         else:
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
                 rs = pandas.merge(*args, on=on, how='outer')
-                self.to_save(rs)
+                self._to_save(rs)
             else:
                 rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 new_args = (rs,) + args[2:]
                 self.join(*new_args, on=on)
 
-    def to_save(self, df):
+    def _to_save(self, df):
         """
         保存数据
         记录最后更新的时间点
         """
         if self.unique and self.last_time:
-            # df.to_dict(orient='dict')
             columns = list(df.columns)
+            print(df.values)
             args = [dict(zip(columns, i)) for i in df.values]
-            self.dst_obj.merge(self.dst_table, args, columns, self.dst_unique)
+            self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
         else:
-            df.to_sql(self.dst_tab.lower(), self.dst_obj.connect,
-                      dtype=String(self._field_default_size),
-                      if_exists='append', chunksize=self.__insert_size, index=False)
+            columns = list(df.columns)
+            sql = "insert into %s(%s) values(%s)" % (
+                self.dst_tab, ','.join(columns),
+                ','.join(["%s" % self._symbol for i in range(len(columns))]))
+            args = list(map(tuple, df.values))
+            self.dst_obj.insert(sql, args)
+            # df.to_sql(self.dst_tab, self.dst_obj.connect,
+            #           dtype=String(self._field_default_size),
+            #           if_exists='append', chunksize=self._insert_size,
+            #           index=False)
+        self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))
         if self.last_time:
             if self.job:

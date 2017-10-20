@@ -5,10 +5,7 @@ sys.path.insert(
     0,
     os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 )
-from py_etl import EtlUtil
-from py_etl import connection
-from py_etl.gis import transform
-from py_etl.gis import geometry
+from py_etl import Etl
 
 
 def eng_test():
