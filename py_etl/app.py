@@ -1,22 +1,15 @@
 from collections import Iterator
-from sqlalchemy.types import String
 from py_db import connection
 import pandas
+import sys
 import functools
 import logging
-from py_etl.log import log
+from py_etl.logger import log
 from py_etl.utils import run_time
 from py_etl.task import TaskConfig
 
 
 def upper(x):
-    """
-    输入中的元素转小写
-    >>> to_lower('ABC')
-    'abc'
-    >>> to_lower(['ABc','CDE'])
-    ['abc', 'cde']
-    """
     if isinstance(x, list):
         return [i.upper() for i in x]
     else:
@@ -25,25 +18,36 @@ def upper(x):
 
 class Etl(object):
     _task_table = 'py_script_task'
-    _query_size = 2000000
-    _insert_size = 200000
-    _field_default_size = 200
+    _query_count = 2000000
+    _insert_count = 200000
+    _field_size = 200
     _debug = False
-    _symbol = ":1"
+    _src_place = ":1"
+    _dst_place = ":1"
 
     @classmethod
     def config(cls, cfg):
-        cls._symbol = getattr(cfg, 'SYMBOL', cls._symbol)
+        cls._src_place = getattr(cfg, 'SRC_PLACEHOLDER', cls._src_place)
+        cls._dst_place = getattr(cfg, 'DST_PLACEHOLDER', cls._dst_place)
         cls._task_table = getattr(cfg, 'TASK_TABLE', cls._task_table)
-        cls._query_size = getattr(cfg, 'QUERY_SIZE', cls._query_size)
-        cls._insert_size = getattr(cfg, 'INSERT_SIZE', cls._insert_size)
-        cls._field_default_size = getattr(
-            cfg, 'NEW_TABLE_FIELD_DEFAULT_SIZE', cls._field_default_size)
+        cls._query_size = getattr(cfg, 'QUERY_COUNT', cls._query_size)
+        cls._insert_size = getattr(cfg, 'INSERT_COUNT', cls._insert_size)
+        cls._field_size = getattr(
+            cfg, 'CREATE_TABLE_FIELD_SIZE', cls._field_size)
         cls.src_uri = getattr(cfg, 'SRC_URI', None)
         cls.dst_uri = getattr(cfg, 'DST_URI', None)
         cls._debug = getattr(cfg, 'DEBUG', cls._debug)
         if cls._debug:
             log.setLevel(logging.DEBUG)
+
+    def add(self, col):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kw):
+                return func(*args, **kw)
+            self.funs[col.upper()] = func
+            return wrapper
+        return decorator
 
     def _connect(self, uri):
         if isinstance(uri, str):
@@ -56,6 +60,29 @@ class Etl(object):
         src_uri = Etl.src_uri if src_uri is None else src_uri
         dst_uri = Etl.dst_uri if dst_uri is None else dst_uri
         return self._connect(src_uri), self._connect(dst_uri)
+
+    def __init__(self, src_tab, dst_tab, mapping, update=None,
+                 unique=None, src_uri=None, dst_uri=None):
+        self.src_tab = src_tab
+        self.dst_tab = dst_tab
+        self.task = TaskConfig(self.src_tab, self.dst_tab)
+        self.src_obj, self.dst_obj = self._create_obj(src_uri, dst_uri)
+        self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
+        self.funs = {i: lambda x: x for i in self.mapping}
+        if unique and update:
+            if upper(unique) in self.mapping:
+                self.unique = upper(unique)
+            else:
+                log.error("unique：%s 名称错误" % self.unique)
+                sys.exit()
+        else:
+            self.unique = None
+
+        if update:
+            self.update = upper(update)
+            self.job, self.last_time = self.task.query()
+        else:
+            self.update = None
 
     def _handle_field(self):
         self.src_field = []
@@ -74,52 +101,19 @@ class Etl(object):
         if self.update:
             self.update_old = self.update
             if self.update not in self.src_field_name:
-                self.src_field.append(self.update)
+                self.src_field.append("%s as etl_update_flag" % self.update)
+                self.update = "etl_update_flag".upper()
             else:
                 self.update = [
                     i.split(" as ") for i in self.src_field if self.update in i
                 ][0][1]
 
-    def __init__(self, src_tab, dst_tab, mapping, update=None,
-                 unique=None, src_uri=None, dst_uri=None):
-        self.src_tab = src_tab
-        self.dst_tab = dst_tab
-        self.task = TaskConfig(self.src_tab, self.dst_tab)
-        self.src_obj, self.dst_obj = self._create_obj(src_uri, dst_uri)
-        self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
-        self.funs = {i: lambda x: x for i in self.mapping}
-
-        if unique and update:
-            if upper(unique) in self.mapping:
-                self.unique = upper(unique)
-            else:
-                log.warn("unique：%s 名称错误" % self.unique)
-                self.unique = None
-        else:
-            self.unique = None
-
-        if update:
-            self.update = upper(update)
-            self.job, self.last_time = self.task.query()
-        else:
-            self.update = None
-        self._handle_field()
-
-    def add(self, col):
-        def decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, **kw):
-                return func(*args, **kw)
-            self.funs[col.upper()] = func
-            return wrapper
-        return decorator
-
     def generate_sql(self, where, groupby):
+        self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
-
         if self.last_time:
-            sql.append("where %s>%s" % (self.update_old, self._symbol))
+            sql.append("where %s>%s" % (self.update_old, self._src_place))
             args = [self.last_time]
             if where:
                 sql.append('and (%s)' % where)
@@ -164,6 +158,11 @@ class Etl(object):
         sql, args = self.generate_sql(where, groupby)
         df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
+            column_upper = [i.upper() for i in list(src_df.columns)]
+            src_df.rename(
+                columns={i: j for i, j in zip(src_df.columns, column_upper)},
+                inplace=True)
+            print(src_df[:4])
             if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
@@ -187,6 +186,10 @@ class Etl(object):
             else:
                 log.info('没有数据更新') if flag is None else None
         else:
+            if not on:
+                log.error("join多个dataframe需要参数on \n"
+                    "example job.join(rs1, rs2, rs3, on=['id'])")
+                sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
                 rs = pandas.merge(*args, on=on, how='outer')
@@ -210,12 +213,12 @@ class Etl(object):
             columns = list(df.columns)
             sql = "insert into %s(%s) values(%s)" % (
                 self.dst_tab, ','.join(columns),
-                ','.join(["%s" % self._symbol for i in range(len(columns))]))
+                ','.join(["%s" % self._dst_place for i in range(len(columns))]))
             args = list(map(tuple, df.values))
-            self.dst_obj.insert(sql, args)
+            self.dst_obj.insert(sql, args, num=self._insert_count)
             # df.to_sql(self.dst_tab, self.dst_obj.connect,
-            #           dtype=String(self._field_default_size),
-            #           if_exists='append', chunksize=self._insert_size,
+            #           dtype=String(self._field_size),
+            #           if_exists='append', chunksize=self._insert_count,
             #           index=False)
         self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))

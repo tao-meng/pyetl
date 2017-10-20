@@ -1,12 +1,13 @@
 class Testing1Config:
     DEBUG = True
-    SRC_URI = "DSN=mydb;UID=root;PWD=password"
-    # SRC_DB_URI = "oracle://jwdn:password@local:1521/xe"
+    SRC_URI = {"uri": "DSN=mydb;UID=root;PWD=password", 'driver': 'pyodbc'}
     DST_URI = "oracle://jwdn:password@local:1521/xe"
-    # TASK_TABLE = 'py_script_task'
-    # QUERY_SIZE = 2000000
-    # INSERT_SIZE = 200000
-    # NEW_TABLE_FIELD_DEFAULT_SIZE = 200
+    # TASK_TABLE = 'task'
+    # QUERY_COUNT = 2000000
+    # INSERT_COUNT = 200000
+    # CREATE_TABLE_FIELD_SIZE = 200
+    # SRC_PLACEHOLDER = "?"
+    # DST_PLACEHOLDER = ":1"
 
 
 class Testing2Config:

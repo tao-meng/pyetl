@@ -7,4 +7,3 @@ __version__ = '2.0.0'
 __all__ = ['Etl', 'log']
 
 from .app import Etl
-from .log import log

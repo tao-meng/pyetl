@@ -1,7 +1,7 @@
 import json
 import functools
 import time
-from py_etl.log import log
+from py_etl.logger import log
 
 
 class ObjEncoder(json.JSONEncoder):
@@ -32,3 +32,19 @@ def run_time(func):
             func.__name__, round(time.time() - T, 3)))
         return rs
     return wrapper
+
+
+def concat_field(field, concat=','):
+    """
+    >>> concat_field(['id','name'])
+    'id,name'
+    """
+    return split_str.join(field)
+
+
+def concat_place(field, place=":1"):
+    """
+    >>> concat_place(['id','name'])
+    ':1,:1'
+    """
+    return ','.join([place for i in range(len(field))])

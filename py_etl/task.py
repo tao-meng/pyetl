@@ -2,24 +2,6 @@ from py_db import connection
 from dateutil.parser import parse
 
 
-# class taskUtil(base.Connection):
-
-#     def __init__(self):
-#         super().__init__()
-
-#     def query(self, src_table, dst_table):
-#         sql = ("select last_time from {task_table} "
-#                "where src_table='{src_table}'"
-#                "and dst_table='{dst_table}'".format(
-#                    src_table=src_table,
-#                    dst_table=dst_table))
-#         return self.insert(sql)
-
-
-# if __name__ == "__main__":
-#     db = taskUtil("task.db", driver="sqlite3")
-
-
 class TaskConfig(object):
 
     def __init__(self, src_table, dst_table, task_table="task",):
@@ -41,7 +23,7 @@ class TaskConfig(object):
                " dst_table varchar(100),"
                " last_time DATETIME)") % self.task_table
         self.db.insert(sql)
-        self.db.insert("delete from %s" % self.task_table)
+        # self.db.insert("delete from %s" % self.task_table)
 
     def append(self, last_time=None):
         id = self.src_table + "_" + self.dst_table
