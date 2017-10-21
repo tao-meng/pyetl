@@ -4,6 +4,6 @@
 """
 __version__ = '2.0.0'
 
-__all__ = ['Etl', 'log']
+__all__ = ['Etl']
 
 from .app import Etl

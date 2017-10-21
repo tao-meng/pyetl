@@ -30,8 +30,8 @@ class Etl(object):
         cls._src_place = getattr(cfg, 'SRC_PLACEHOLDER', cls._src_place)
         cls._dst_place = getattr(cfg, 'DST_PLACEHOLDER', cls._dst_place)
         cls._task_table = getattr(cfg, 'TASK_TABLE', cls._task_table)
-        cls._query_size = getattr(cfg, 'QUERY_COUNT', cls._query_size)
-        cls._insert_size = getattr(cfg, 'INSERT_COUNT', cls._insert_size)
+        cls._query_count = getattr(cfg, 'QUERY_COUNT', cls._query_count)
+        cls._insert_count = getattr(cfg, 'INSERT_COUNT', cls._insert_count)
         cls._field_size = getattr(
             cfg, 'CREATE_TABLE_FIELD_SIZE', cls._field_size)
         cls.src_uri = getattr(cfg, 'SRC_URI', None)
@@ -134,13 +134,12 @@ class Etl(object):
         df_iterator = pandas.read_sql(
             sql, self.src_obj.connect,
             params=args,
-            chunksize=self._query_size)
+            chunksize=self._query_count)
         return df_iterator
 
     def _handle_data(self, src_df):
         if self.unique:
             df_sorted = src_df.sort_values(by=self.update, ascending=False)
-            # print(df_sorted)
             src_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
             # print(df_drop)
@@ -151,7 +150,7 @@ class Etl(object):
                 data[i] = pandas.Series(merge_arr).map(self.funs[i])
             else:
                 data[i] = src_df[i].map(self.funs[i])
-        dst_df = pandas.DataFrame(data)
+        dst_df = pandas.DataFrame(data)[list(self.mapping.keys())]
         return dst_df
 
     def run(self, where=None, groupby=None):
@@ -162,15 +161,14 @@ class Etl(object):
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
-            print(src_df[:4])
+            log.debug("src data\n%s\n..." % src_df[:5])
             if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
-            # if self._debug:
-            #     dst_df.info()
-            # print(dst_df)
+            # dst_df.info()
+            log.debug("dst data\n%s\n..." % dst_df[:5])
             yield dst_df
 
     @run_time
@@ -188,7 +186,7 @@ class Etl(object):
         else:
             if not on:
                 log.error("join多个dataframe需要参数on \n"
-                    "example job.join(rs1, rs2, rs3, on=['id'])")
+                          "example job.join(rs1, rs2, rs3, on=['id'])")
                 sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
@@ -206,7 +204,6 @@ class Etl(object):
         """
         if self.unique and self.last_time:
             columns = list(df.columns)
-            print(df.values)
             args = [dict(zip(columns, i)) for i in df.values]
             self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
         else:
@@ -216,12 +213,7 @@ class Etl(object):
                 ','.join(["%s" % self._dst_place for i in range(len(columns))]))
             args = list(map(tuple, df.values))
             self.dst_obj.insert(sql, args, num=self._insert_count)
-            # df.to_sql(self.dst_tab, self.dst_obj.connect,
-            #           dtype=String(self._field_size),
-            #           if_exists='append', chunksize=self._insert_count,
-            #           index=False)
         self.dst_obj.commit()
-        log.info('插入数量：%s' % len(df))
         if self.last_time:
             if self.job:
                 self.task.update(self.last_time.__str__())
@@ -229,3 +221,4 @@ class Etl(object):
                 self.task.append(self.last_time.__str__())
         else:
             self.task.append()
+        log.info('插入数量：%s' % len(df))

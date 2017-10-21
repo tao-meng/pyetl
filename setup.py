@@ -13,7 +13,7 @@ setup(
     version=version,
     install_requires=[
         'pandas>=0.19.0',
-        'SQLAlchemy>=1.0.15',
+        'sqlalchemy>=1.1.14',
         'python-dateutil>=2.5.0'],
     description='python etl frame',
     classifiers=[

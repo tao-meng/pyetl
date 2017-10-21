@@ -23,7 +23,7 @@ class TaskConfig(object):
                " dst_table varchar(100),"
                " last_time DATETIME)") % self.task_table
         self.db.insert(sql)
-        # self.db.insert("delete from %s" % self.task_table)
+        self.db.insert("delete from %s" % self.task_table)
 
     def append(self, last_time=None):
         id = self.src_table + "_" + self.dst_table
