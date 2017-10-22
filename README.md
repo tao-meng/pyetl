@@ -1,5 +1,9 @@
 py_etl frame based on pandas and sqlalchemy
 
+'2.0.0'
+1.分离db, gis模块
+2.代码重构
+
 '1.1.4'
 1.数据源支持非sqlalchemy engine, 支持普通db适配器连接方式
 
