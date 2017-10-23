@@ -11,11 +11,11 @@ class Testing1Config:
 
 
 class Testing2Config:
-    # DEBUG = True
-    # SRC_URI = "oracle://jwdn:password@local:1521/xe"
-    # DST_URI = "oracle://jwdn:password@local:1521/xe"
-    SRC_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
-    DST_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
+    DEBUG = True
+    SRC_URI = "oracle://jwdn:password@local:1521/xe"
+    DST_URI = "oracle://jwdn:password@local:1521/xe"
+    # SRC_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
+    # DST_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
 
 
 class DevelopmentConfig:

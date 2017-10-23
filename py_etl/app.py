@@ -42,11 +42,11 @@ class Etl(object):
 
     def add(self, col):
         def decorator(func):
-            @functools.wraps(func)
-            def wrapper(*args, **kw):
-                return func(*args, **kw)
+            # @functools.wraps(func)
+            # def wrapper(*args, **kw):
+            #     return func(*args, **kw)
             self.funs[col.upper()] = func
-            return wrapper
+            # return wrapper
         return decorator
 
     def _connect(self, uri):
@@ -144,6 +144,7 @@ class Etl(object):
             src_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
             # print(df_drop)
+        log.debug("src data\n%s\n..." % src_df[:5])
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, list):
@@ -163,7 +164,7 @@ class Etl(object):
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
-            log.debug("src data\n%s\n..." % src_df[:5])
+            # log.debug("src data\n%s\n..." % src_df[:5])
             if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
@@ -174,7 +175,7 @@ class Etl(object):
             yield dst_df
 
     @run_time
-    def join(self, *args, on=''):
+    def save(self, *args, on=''):
         """
         合并数据入库
         """

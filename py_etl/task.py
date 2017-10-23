@@ -7,8 +7,8 @@ class TaskConfig(object):
     def __init__(self, src_table, dst_table, task_table="task",):
         self.db = connection('task.db', driver='sqlite3')
         self.task_table = task_table
-        self.src_table = src_table
-        self.dst_table = dst_table
+        self.src_table = src_table.lower()
+        self.dst_table = dst_table.lower()
         self.init_db()
 
     def exist_table(self):
