@@ -5,7 +5,7 @@ import sys
 import functools
 import logging
 from py_etl.logger import log
-from py_etl.utils import run_time
+from py_etl.utils import run_time, concat_place
 from py_etl.task import TaskConfig
 
 
@@ -53,6 +53,7 @@ class Etl(object):
         if isinstance(uri, str):
             return connection(uri, debug=self._debug)
         else:
+            uri = uri.copy()
             args = [uri.pop('uri', ())]
             return connection(*args, **uri, debug=self._debug)
 
@@ -155,6 +156,7 @@ class Etl(object):
 
     def run(self, where=None, groupby=None):
         sql, args = self.generate_sql(where, groupby)
+        log.debug("%s\n%s" % (sql, args))
         df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
             column_upper = [i.upper() for i in list(src_df.columns)]
@@ -202,23 +204,22 @@ class Etl(object):
         保存数据
         记录最后更新的时间点
         """
-        if self.unique and self.last_time:
-            columns = list(df.columns)
-            args = [dict(zip(columns, i)) for i in df.values]
-            self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
-        else:
-            columns = list(df.columns)
-            sql = "insert into %s(%s) values(%s)" % (
-                self.dst_tab, ','.join(columns),
-                ','.join(["%s" % self._dst_place for i in range(len(columns))]))
-            args = list(map(tuple, df.values))
-            self.dst_obj.insert(sql, args, num=self._insert_count)
-        self.dst_obj.commit()
+        columns = list(df.columns)
+        sql = "insert into %s(%s) values(%s)" % (
+            self.dst_tab, ','.join(columns),
+            concat_place(columns, place=self._dst_place))
         if self.last_time:
             if self.job:
+                args = [dict(zip(columns, i)) for i in df.values]
+                self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
                 self.task.update(self.last_time.__str__())
             else:
+                args = list(map(tuple, df.values))
+                self.dst_obj.insert(sql, args, num=self._insert_count)
                 self.task.append(self.last_time.__str__())
         else:
+            args = list(map(tuple, df.values))
+            self.dst_obj.insert(sql, args, num=self._insert_count)
             self.task.append()
+        self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))
