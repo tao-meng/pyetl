@@ -2,9 +2,7 @@ from collections import Iterator
 from py_db import connection
 import pandas
 import sys
-import functools
 import logging
-import datetime
 from py_etl.logger import log
 from py_etl.utils import run_time, concat_place
 from py_etl.task import TaskConfig

@@ -14,8 +14,8 @@ def task1():
     mapping = {'FOO': 'id', 'fssj': 'dtime', 'BAR': 'foo'}
     app = Etl(src_tab, dst_tab, mapping, update=src_update, unique=dst_unique)
     app.config(config['testing1'])
-    app.save(app.run(days=7))
-    # app.save(app.run())
+    # app.save(app.run(days=1))
+    app.save(app.run())
 
 
 def task2():
@@ -26,10 +26,10 @@ def task2():
     mapping = {'FOO': 'SGDH', 'fssj': 'fssj', 'BAR': 'SGDDMS'}
     app = Etl(src_tab, dst_tab, mapping, update=src_update, unique=dst_unique)
     app.config(config['testing2'])
-    app.add('BAR')(f1)
-    app.save(app.run(where="rownum<100"))
+    app.add('FOO')(f1)
+    app.save(app.run())
 
 
 if __name__ == '__main__':
-    task1()
+    # task1()
     task2()

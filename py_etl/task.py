@@ -5,11 +5,12 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, '..')
 from py_etl.utils import dtutil
+from py_etl.logger import log
 
 
 class TaskConfig(object):
 
-    def __init__(self, src_table, dst_table, task_table="task", empty):
+    def __init__(self, src_table, dst_table, task_table="task"):
         self.db = connection('task.db', driver='sqlite3')
         self.task_table = task_table
         self.src_table = src_table.lower()
@@ -58,9 +59,19 @@ class TaskConfig(object):
         self.db.commit()
 
     def query(self, days=None):
+        if days == 0:
+            log.warn("days 参数为 0 全量重跑")
+            self.db.insert(
+                "delete from {task_table} "
+                "where src_table='{src_table}' "
+                "and dst_table='{dst_table}'".format(
+                    task_table=self.task_table,
+                    src_table=self.src_table,
+                    dst_table=self.dst_table))
+            return (None, None)
         res = self.db.query(
             "select 1, last_time, date_type from {task_table} "
-            "where src_table='{src_table}'"
+            "where src_table='{src_table}' "
             "and dst_table='{dst_table}'".format(
                 task_table=self.task_table,
                 src_table=self.src_table,

@@ -119,6 +119,6 @@ dtutil = DateUtility()
 
 if __name__ == "__main__":
     now = datetime.datetime.now()
-    rs = dtutil.delta_date('20170930', '20171001')
+    rs = dtutil.days_ago_str(now, delta=0)
     rs2 = dtutil.days_ago()
     print(rs, rs2.__repr__())
