@@ -1,10 +1,15 @@
 from py_db import connection
 from dateutil.parser import parse
+import datetime
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, '..')
+from py_etl.utils import dtutil
 
 
 class TaskConfig(object):
 
-    def __init__(self, src_table, dst_table, task_table="task",):
+    def __init__(self, src_table, dst_table, task_table="task", empty):
         self.db = connection('task.db', driver='sqlite3')
         self.task_table = task_table
         self.src_table = src_table.lower()
@@ -21,38 +26,54 @@ class TaskConfig(object):
                " %s(id varchar(500) primary key,"
                " src_table varchar(400),"
                " dst_table varchar(100),"
-               " last_time DATETIME)") % self.task_table
+               " date_type varchar(1),"
+               " last_time varchar(20))") % self.task_table
         self.db.insert(sql)
-        # self.db.insert("delete from %s" % self.task_table)
 
     def append(self, last_time=None):
         id = self.src_table + "_" + self.dst_table
+        if isinstance(last_time, datetime.datetime):
+            date_type = 1
+            last_time = str(last_time)
+        else:
+            date_type = 0
         self.db.insert(
-            "insert into %s(id,last_time,src_table,dst_table) "
-            "values(:1,:1,:1,:1)" % self.task_table,
-            [id, last_time, self.src_table, self.dst_table]
+            "insert into %s(id,last_time,date_type,src_table,dst_table) "
+            "values(:1,:1,:1,:1,:1)" % self.task_table,
+            [id, last_time, date_type, self.src_table, self.dst_table]
         )
         self.db.commit()
 
     def update(self, last_time):
+        if isinstance(last_time, datetime.datetime):
+            date_type = 1
+            last_time = str(last_time)
+        else:
+            date_type = 0
         self.db.insert(
-            "update %s set last_time=:1 "
+            "update %s set last_time=:1,date_type=:1 "
             "where src_table=:1 and dst_table=:1" % self.task_table,
-            [last_time, self.src_table, self.dst_table]
+            [last_time, date_type, self.src_table, self.dst_table]
         )
         self.db.commit()
 
-    def query(self):
+    def query(self, days=None):
         res = self.db.query(
-            "select 1, last_time from {task_table} "
+            "select 1, last_time, date_type from {task_table} "
             "where src_table='{src_table}'"
             "and dst_table='{dst_table}'".format(
                 task_table=self.task_table,
                 src_table=self.src_table,
                 dst_table=self.dst_table))
         if res:
-            dt = parse(res[0][1]) if res[0][1] else res[0][1]
-            return res[0], dt
+            if res[0][1]:
+                if res[0][2]:
+                    dt = parse(dtutil.days_ago_str(res[0][1], delta=days))
+                else:
+                    dt = dtutil.days_ago_str(res[0][1], delta=days)
+            else:
+                dt = res[0][1]
+            return res[0][0], dt
         else:
             return (None, None)
 

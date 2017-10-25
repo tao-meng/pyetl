@@ -4,6 +4,7 @@ import pandas
 import sys
 import functools
 import logging
+import datetime
 from py_etl.logger import log
 from py_etl.utils import run_time, concat_place
 from py_etl.task import TaskConfig
@@ -17,36 +18,37 @@ def upper(x):
 
 
 class Etl(object):
+    _src_place = ":1"
+    _dst_place = ":1"
     _task_table = 'py_script_task'
     _query_count = 2000000
     _insert_count = 200000
     _field_size = 200
     _debug = False
-    _src_place = ":1"
-    _dst_place = ":1"
 
-    @classmethod
-    def config(cls, cfg):
-        cls._src_place = getattr(cfg, 'SRC_PLACEHOLDER', cls._src_place)
-        cls._dst_place = getattr(cfg, 'DST_PLACEHOLDER', cls._dst_place)
-        cls._task_table = getattr(cfg, 'TASK_TABLE', cls._task_table)
-        cls._query_count = getattr(cfg, 'QUERY_COUNT', cls._query_count)
-        cls._insert_count = getattr(cfg, 'INSERT_COUNT', cls._insert_count)
-        cls._field_size = getattr(
-            cfg, 'CREATE_TABLE_FIELD_SIZE', cls._field_size)
-        cls.src_uri = getattr(cfg, 'SRC_URI', None)
-        cls.dst_uri = getattr(cfg, 'DST_URI', None)
-        cls._debug = getattr(cfg, 'DEBUG', cls._debug)
-        if cls._debug:
+    def config(self, cfg):
+        self._src_place = getattr(cfg, 'SRC_PLACEHOLDER', self._src_place)
+        self._dst_place = getattr(cfg, 'DST_PLACEHOLDER', self._dst_place)
+        self._task_table = getattr(cfg, 'TASK_TABLE', self._task_table)
+        self._query_count = getattr(cfg, 'QUERY_COUNT', self._query_count)
+        self._insert_count = getattr(cfg, 'INSERT_COUNT', self._insert_count)
+        self._field_size = getattr(
+            cfg, 'CREATE_TABLE_FIELD_SIZE', self._field_size)
+        self._debug = getattr(cfg, 'DEBUG', self._debug)
+        if self._debug:
             log.setLevel(logging.DEBUG)
+        self.src_uri = getattr(cfg, 'SRC_URI', None)
+        self.dst_uri = getattr(cfg, 'DST_URI', None)
+        if self.src_uri is None or self.dst_uri is None:
+            log.error('没有配置数据库uri')
+            sys.exit(1)
+        self.src_obj, self.dst_obj = self._create_obj(
+            self.src_uri, self.dst_uri)
+        self.is_config = True
 
     def add(self, col):
         def decorator(func):
-            # @functools.wraps(func)
-            # def wrapper(*args, **kw):
-            #     return func(*args, **kw)
             self.funs[col.upper()] = func
-            # return wrapper
         return decorator
 
     def _connect(self, uri):
@@ -58,16 +60,14 @@ class Etl(object):
             return connection(*args, **uri, debug=self._debug)
 
     def _create_obj(self, src_uri, dst_uri):
-        src_uri = Etl.src_uri if src_uri is None else src_uri
-        dst_uri = Etl.dst_uri if dst_uri is None else dst_uri
+        # src_uri = Etl.src_uri if src_uri is None else src_uri
+        # dst_uri = Etl.dst_uri if dst_uri is None else dst_uri
         return self._connect(src_uri), self._connect(dst_uri)
 
-    def __init__(self, src_tab, dst_tab, mapping, update=None,
-                 unique=None, src_uri=None, dst_uri=None):
+    def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
         self.src_tab = src_tab
         self.dst_tab = dst_tab
-        self.task = TaskConfig(self.src_tab, self.dst_tab)
-        self.src_obj, self.dst_obj = self._create_obj(src_uri, dst_uri)
+        self.is_config = False
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
         self.funs = {i: lambda x: x for i in self.mapping}
         if unique and update:
@@ -75,13 +75,11 @@ class Etl(object):
                 self.unique = upper(unique)
             else:
                 log.error("unique：%s 名称错误" % self.unique)
-                sys.exit()
+                sys.exit(1)
         else:
             self.unique = None
-
         if update:
             self.update = upper(update)
-            self.job, self.last_time = self.task.query()
         else:
             self.update = None
 
@@ -109,7 +107,10 @@ class Etl(object):
                     i.split(" as ") for i in self.src_field if self.update in i
                 ][0][1]
 
-    def generate_sql(self, where, groupby):
+    def generate_sql(self, where, groupby, days):
+        self.task = TaskConfig(self.src_tab, self.dst_tab)
+        if self.update:
+            self.job, self.last_time = self.task.query(days)
         self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
@@ -144,7 +145,10 @@ class Etl(object):
             src_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
             # print(df_drop)
-        log.debug("src data\n%s\n..." % src_df[:5])
+        if len(src_df) > 5:
+            log.debug("src data\n%s\n..." % src_df[:5])
+        else:
+            log.debug("src data\n%s" % src_df[:5])
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, list):
@@ -155,9 +159,12 @@ class Etl(object):
         dst_df = pandas.DataFrame(data)[list(self.mapping.keys())]
         return dst_df
 
-    def run(self, where=None, groupby=None):
-        sql, args = self.generate_sql(where, groupby)
-        log.debug("%s\n%s" % (sql, args))
+    def run(self, where=None, groupby=None, days=None):
+        if not self.is_config:
+            log.error('需要先加载配置文件')
+            sys.exit(1)
+        sql, args = self.generate_sql(where, groupby, days)
+        log.debug("%s, SQL param: %s" % (sql, args))
         df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
             column_upper = [i.upper() for i in list(src_df.columns)]
@@ -171,7 +178,10 @@ class Etl(object):
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
             # dst_df.info()
-            log.debug("dst data\n%s\n..." % dst_df[:5])
+            if len(dst_df) > 5:
+                log.debug("dst data\n%s\n..." % dst_df[:5])
+            else:
+                log.debug("dst data\n%s" % dst_df[:5])
             yield dst_df
 
     @run_time
@@ -213,11 +223,11 @@ class Etl(object):
             if self.job:
                 args = [dict(zip(columns, i)) for i in df.values]
                 self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
-                self.task.update(self.last_time.__str__())
+                self.task.update(self.last_time)
             else:
                 args = list(map(tuple, df.values))
                 self.dst_obj.insert(sql, args, num=self._insert_count)
-                self.task.append(self.last_time.__str__())
+                self.task.append(self.last_time)
         else:
             args = list(map(tuple, df.values))
             self.dst_obj.insert(sql, args, num=self._insert_count)
