@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+
+__author__ = "lyt"
+
 """
     A python etl frame based on pandas and sqlalchemy
 """
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 __all__ = ['Etl']
 

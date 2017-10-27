@@ -38,7 +38,7 @@ class Etl(object):
         self.src_uri = getattr(cfg, 'SRC_URI', None)
         self.dst_uri = getattr(cfg, 'DST_URI', None)
         if self.src_uri is None or self.dst_uri is None:
-            log.error('没有配置数据库uri')
+            log.error('没有配置数据库uri\nEXIT')
             sys.exit(1)
         self.src_obj, self.dst_obj = self._create_obj(
             self.src_uri, self.dst_uri)
@@ -72,7 +72,7 @@ class Etl(object):
             if upper(unique) in self.mapping:
                 self.unique = upper(unique)
             else:
-                log.error("unique：%s 名称错误" % self.unique)
+                log.error("unique：%s 名称错误\nEXIT" % self.unique)
                 sys.exit(1)
         else:
             self.unique = None
@@ -144,9 +144,10 @@ class Etl(object):
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
             # print(df_drop)
         if len(src_df) > 5:
-            log.debug("src data\n%s\n..." % src_df[:5])
+            log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
             log.debug("src data\n%s" % src_df[:5])
+        # log.debug("dst data\n%s" % src_df)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, list):
@@ -159,7 +160,7 @@ class Etl(object):
 
     def run(self, where=None, groupby=None, days=None):
         if not self.is_config:
-            log.error('需要先加载配置文件')
+            log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
         sql, args = self.generate_sql(where, groupby, days)
         log.debug("%s, SQL param: %s" % (sql, args))
@@ -177,9 +178,10 @@ class Etl(object):
             dst_df = self._handle_data(src_df)
             # dst_df.info()
             if len(dst_df) > 5:
-                log.debug("dst data\n%s\n..." % dst_df[:5])
+                log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
             else:
                 log.debug("dst data\n%s" % dst_df[:5])
+            # log.debug("dst data\n%s" % dst_df)
             yield dst_df
 
     @run_time
@@ -197,7 +199,8 @@ class Etl(object):
         else:
             if not on:
                 log.error("join多个dataframe需要参数on \n"
-                          "example job.join(rs1, rs2, rs3, on=['id'])")
+                          "example job.join(rs1, rs2, rs3, on=['id'])"
+                          "\nEXIT")
                 sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:

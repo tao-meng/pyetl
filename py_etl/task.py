@@ -1,9 +1,9 @@
 from py_db import connection
 from dateutil.parser import parse
 import datetime
-if __name__ == "__main__":
-    import sys
-    sys.path.insert(0, '..')
+# if __name__ == "__main__":
+#     import sys
+#     sys.path.insert(0, '..')
 from py_etl.utils import dtutil
 from py_etl.logger import log
 

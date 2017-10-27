@@ -1,5 +1,9 @@
 py_etl frame based on pandas and sqlalchemy
 
+'2.0.1'
+1.run函数增加days 参数，支持向前几天接数据， days 为0时代表清空task记录，重新全量获取
+2.config 改成实例方法
+
 '2.0.0'
 1.分离db, gis模块
 2.代码重构

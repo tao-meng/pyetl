@@ -23,7 +23,7 @@ setup(
         'Operating System :: OS Independent',
     ],
     author='lyt',
-    url='https://github.com/taogeYT/etl',
+    url='https://github.com/taogeYT/py_etl',
     author_email='liyt@vastio.com',
     license='MIT',
     packages=find_packages(),
