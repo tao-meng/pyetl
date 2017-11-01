@@ -112,7 +112,7 @@ class Etl(object):
         self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
-        if self.last_time:
+        if self.update:
             sql.append("where %s>%s" % (self.update_old, self._src_place))
             args = [self.last_time]
             if where:
@@ -220,7 +220,7 @@ class Etl(object):
         sql = "insert into %s(%s) values(%s)" % (
             self.dst_tab, ','.join(columns),
             concat_place(columns, place=self._dst_place))
-        if self.last_time:
+        if self.update:
             if self.job:
                 args = [dict(zip(columns, i)) for i in df.values]
                 self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
@@ -233,5 +233,5 @@ class Etl(object):
             args = list(map(tuple, df.values))
             self.dst_obj.insert(sql, args, num=self._insert_count)
             self.task.append()
-        self.dst_obj.commit()
+        # self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))
