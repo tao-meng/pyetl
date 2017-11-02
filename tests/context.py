@@ -34,10 +34,13 @@ def pandas_test():
     sql = 'select sgdh,fssj,sgdddm from ACCIDENT where rownum<:1'
     # sql = 'SELECT * FROM ETL_TEST_SRC where dtime>:1'
     df = pandas.read_sql(sql, eng, params=[5])
+
+    # dataframe类型转换
     # df['id'] = df['id'].astype('int')
     # df['length'] = df['length'].astype('float64')
     # print(len(df))
-    print(df)
+
+    # dataframe排序
     # print(df.sort_index(by='FSSJ', ascending=False))
     # columns = list(df.columns)
     # rs = [dict(zip(columns, i)) for i in df.values]

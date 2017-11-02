@@ -16,6 +16,13 @@ def upper(x):
         return x.upper()
 
 
+def _change(func):
+    def wrap(x):
+        rs = func(*[i for i in x])
+        return pandas.Series(list(rs))
+    return wrap
+
+
 class Etl(object):
     _src_place = ":1"
     _dst_place = ":1"
@@ -68,7 +75,8 @@ class Etl(object):
         self.dst_tab = dst_tab
         self.is_config = False
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
-        self.funs = {i: lambda x: x for i in self.mapping}
+        # self.funs = {i: lambda x: x for i in self.mapping}
+        self.funs = {}
         if unique and update:
             if upper(unique) in self.mapping:
                 self.unique = upper(unique)
@@ -110,16 +118,20 @@ class Etl(object):
         self.task = TaskConfig(self.src_tab, self.dst_tab)
         if self.update:
             self.job, self.last_time = self.task.query(days)
+        else:
+            self.job, self.last_time = None, None
         self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
+        args = []
         if self.update:
-            sql.append("where %s>%s" % (self.update_old, self._src_place))
-            args = [self.last_time]
+            sql.append("where %s is not null" % self.update_old)
+            if self.last_time:
+                sql.append("and %s>%s" % (self.update_old, self._src_place))
+                args = [self.last_time]
             if where:
                 sql.append('and (%s)' % where)
         else:
-            args = []
             if where:
                 sql.append('where (%s)' % where)
         if groupby:
@@ -152,9 +164,29 @@ class Etl(object):
         for i, j in self.mapping.items():
             if isinstance(j, list):
                 merge_arr = map(list, zip(*[src_df[x] for x in j]))
-                data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                if i in self.funs:
+                    data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                    self.funs.pop(i)
+                else:
+                    log.error("'{}'字段是一个列表需要添加处理函数\nEXIT".format(i))
+                    sys.exit(1)
             else:
-                data[i] = src_df[i].map(self.funs[i])
+                if i in self.funs:
+                    data[i] = src_df[i].map(self.funs[i])
+                    self.funs.pop(i)
+                else:
+                    data[i] = src_df[i]
+        for i in self.funs:
+            cols = list(i)
+            if (isinstance(i, tuple) and
+                    (set(cols) & set(self.mapping.keys()) == set(cols))):
+                tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
+                # print(src_df[cols].dtypes, tmp_df.dtypes)
+                for idx, col in enumerate(cols):
+                    data[col] = tmp_df[idx]
+            else:
+                log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
+                sys.exit(1)
         dst_df = pandas.DataFrame(data)[list(self.mapping.keys())]
         return dst_df
 
@@ -163,7 +195,7 @@ class Etl(object):
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
         sql, args = self.generate_sql(where, groupby, days)
-        log.debug("%s, SQL param: %s" % (sql, args))
+        log.debug("%s, Param: %s" % (sql, args))
         df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
             column_upper = [i.upper() for i in list(src_df.columns)]
@@ -172,6 +204,10 @@ class Etl(object):
                 inplace=True)
             # log.debug("src data\n%s\n..." % src_df[:5])
             if self.update:
+                # print((src_df[self.update].dtypes))
+                # src_df[self.update] = src_df[self.update].astype(
+                #     'datetime64[ns]')
+                # print((src_df[self.update].dtypes))
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
@@ -220,7 +256,7 @@ class Etl(object):
         sql = "insert into %s(%s) values(%s)" % (
             self.dst_tab, ','.join(columns),
             concat_place(columns, place=self._dst_place))
-        if self.update:
+        if self.last_time:
             if self.job:
                 args = [dict(zip(columns, i)) for i in df.values]
                 self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
@@ -232,6 +268,6 @@ class Etl(object):
         else:
             args = list(map(tuple, df.values))
             self.dst_obj.insert(sql, args, num=self._insert_count)
-            # self.task.append()
+            self.task.append()
         self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))
