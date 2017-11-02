@@ -32,7 +32,11 @@ class TaskConfig(object):
         self.db.insert(sql)
 
     def append(self, last_time=None):
-        id = self.src_table + "_" + self.dst_table
+        id = self.src_table + "||" + self.dst_table
+        exist = self.db.query(
+            "select * from {} where id='{}'".format(self.task_table, id))
+        if exist:
+            return None
         if isinstance(last_time, datetime.datetime):
             date_type = 1
             last_time = str(last_time)
@@ -93,5 +97,5 @@ if __name__ == "__main__":
     job = TaskConfig("tab1", "tab2")
     # job.append(datetime.datetime(2017, 9, 12).__str__())
     # job.modify(datetime.datetime(2017, 10, 19, 14, 34).__str__())
-    rs = job.query()
+    rs = job.append()
     print(rs)

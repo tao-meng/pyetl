@@ -10,7 +10,8 @@ from py_etl.task import TaskConfig
 
 def upper(x):
     if isinstance(x, list):
-        return [i.upper() for i in x]
+        # return [i.upper() for i in x]
+        return tuple([i.upper() for i in x])
     else:
         return x.upper()
 
@@ -46,7 +47,7 @@ class Etl(object):
 
     def add(self, col):
         def decorator(func):
-            self.funs[col.upper()] = func
+            self.funs[upper(col)] = func
         return decorator
 
     def _connect(self, uri):
@@ -147,7 +148,6 @@ class Etl(object):
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
             log.debug("src data\n%s" % src_df[:5])
-        # log.debug("dst data\n%s" % src_df)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, list):
@@ -232,6 +232,6 @@ class Etl(object):
         else:
             args = list(map(tuple, df.values))
             self.dst_obj.insert(sql, args, num=self._insert_count)
-            self.task.append()
-        # self.dst_obj.commit()
+            # self.task.append()
+        self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))

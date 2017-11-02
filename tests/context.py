@@ -31,9 +31,9 @@ def pandas_test():
     from sqlalchemy import create_engine
     eng = create_engine(
         "oracle+cx_oracle://jwdn:password@local:1521/xe", echo=True)
-    # sql = 'select sgdh,fssj,sgddms from ACCIDENT where rownum<5'
-    sql = 'SELECT * FROM ETL_TEST_SRC where dtime>:1'
-    df = pandas.read_sql(sql, eng, params=[datetime.datetime(2017, 9, 20)])
+    sql = 'select sgdh,fssj,sgdddm from ACCIDENT where rownum<:1'
+    # sql = 'SELECT * FROM ETL_TEST_SRC where dtime>:1'
+    df = pandas.read_sql(sql, eng, params=[5])
     # df['id'] = df['id'].astype('int')
     # df['length'] = df['length'].astype('float64')
     # print(len(df))
@@ -43,9 +43,14 @@ def pandas_test():
     # rs = [dict(zip(columns, i)) for i in df.values]
     # print(rs)
     # print(type(df.values))
+    return df
+
+
+def func(x):
+    return x + '1'
 
 
 if __name__ == "__main__":
     # eng_test()
     # db_test()
-    pandas_test()
+    df = pandas_test()
