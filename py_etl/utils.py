@@ -90,9 +90,10 @@ class DateUtility(object):
         >>> dtutil.days_ago_str(days=1)
         '20171024'
         """
+        print(date)
         if delta:
             result_date = parser.parse(str(date)) - datetime.timedelta(days=delta)
-            return result_date.strftime('%Y%m%d')
+            return result_date.strftime('%Y%m%d%H%M%S')
         else:
             return date
 

@@ -50,6 +50,7 @@ class Etl(object):
             sys.exit(1)
         self.src_obj, self.dst_obj = self._create_obj(
             self.src_uri, self.dst_uri)
+        self.db = self.dst_obj
         self.is_config = True
 
     def add(self, col):
