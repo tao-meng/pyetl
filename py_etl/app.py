@@ -95,7 +95,7 @@ class Etl(object):
         self.src_field = []
         self.src_field_name = []
         for i, j in self.mapping.items():
-            if isinstance(j, list):
+            if isinstance(j, (list, tuple)):
                 self.src_field_name.extend(j)
                 self.src_field.extend(
                     ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
@@ -156,30 +156,33 @@ class Etl(object):
             df_sorted = src_df.sort_values(by=self.update, ascending=False)
             src_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
-            # print(df_drop)
+        log.warn('src len: %s' % len(src_df))
         if len(src_df) > 5:
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
             log.debug("src data\n%s" % src_df[:5])
         data = {}
         for i, j in self.mapping.items():
-            if isinstance(j, list):
-                merge_arr = map(list, zip(*[src_df[x] for x in j]))
+            if isinstance(j, (list, tuple)):
+                # merge_arr = map(list, zip(*[src_df[x] for x in j]))
+                merge_arr = list(zip(*[src_df[x].values for x in j]))
                 if i in self.funs:
-                    data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                    # data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                    data[i] = pandas.Series((map(self.funs[i], merge_arr)))
                     self.funs.pop(i)
                 else:
                     log.error("'{}'字段是一个列表需要添加处理函数\nEXIT".format(i))
                     sys.exit(1)
             else:
                 if i in self.funs:
-                    data[i] = src_df[i].map(self.funs[i])
+                    # data[i] = src_df[i].map(self.funs[i])
+                    data[i] = pandas.Series(map(self.funs[i], src_df[i].values))
                     self.funs.pop(i)
                 else:
                     data[i] = src_df[i]
         for i in self.funs:
             cols = list(i)
-            if (isinstance(i, tuple) and
+            if (isinstance(i, (tuple, list)) and
                     (set(cols) & set(self.mapping.keys()) == set(cols))):
                 tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
                 # print(src_df[cols].dtypes, tmp_df.dtypes)
@@ -189,6 +192,7 @@ class Etl(object):
                 log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
                 sys.exit(1)
         dst_df = pandas.DataFrame(data)[list(self.mapping.keys())]
+        print(len(data[i]), len(dst_df))
         return dst_df
 
     def run(self, where=None, groupby=None, days=None):
