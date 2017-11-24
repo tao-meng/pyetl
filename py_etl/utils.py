@@ -85,9 +85,9 @@ class DateUtility(object):
         end = parser.parse(end)
         return (end - start).days
 
-    def days_ago_str(self, date=datetime.date.today(), delta=None):
+    def days_ago_str(self, delta=None, date=datetime.date.today()):
         """
-        >>> dtutil.days_ago_str(days=1)
+        >>> dtutil.days_ago_str(delta=1)
         '20171024'
         """
         print(date)

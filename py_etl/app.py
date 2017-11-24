@@ -1,6 +1,7 @@
 from collections import Iterator
 from py_db import connection
 import pandas
+from collections import defaultdict
 import sys
 import logging
 from py_etl.logger import log
@@ -152,11 +153,6 @@ class Etl(object):
         return df_iterator
 
     def _handle_data(self, src_df):
-        if self.unique:
-            df_sorted = src_df.sort_values(by=self.update, ascending=False)
-            src_df = df_sorted.drop_duplicates([self.unique])
-            # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
-        log.warn('src len: %s' % len(src_df))
         if len(src_df) > 5:
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
@@ -164,19 +160,19 @@ class Etl(object):
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
-                # merge_arr = map(list, zip(*[src_df[x] for x in j]))
-                merge_arr = list(zip(*[src_df[x].values for x in j]))
+                merge_arr = map(list, zip(*[src_df[x] for x in j]))
+                # merge_arr = list(zip(*[src_df[x].values for x in j]))
                 if i in self.funs:
-                    # data[i] = pandas.Series(merge_arr).map(self.funs[i])
-                    data[i] = pandas.Series((map(self.funs[i], merge_arr)))
+                    data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                    # data[i] = pandas.Series((map(self.funs[i], merge_arr)))
                     self.funs.pop(i)
                 else:
                     log.error("'{}'字段是一个列表需要添加处理函数\nEXIT".format(i))
                     sys.exit(1)
             else:
                 if i in self.funs:
-                    # data[i] = src_df[i].map(self.funs[i])
-                    data[i] = pandas.Series(map(self.funs[i], src_df[i].values))
+                    data[i] = src_df[i].map(self.funs[i])
+                    # data[i] = pandas.Series(map(self.funs[i], src_df[i].values))
                     self.funs.pop(i)
                 else:
                     data[i] = src_df[i]
@@ -185,14 +181,30 @@ class Etl(object):
             if (isinstance(i, (tuple, list)) and
                     (set(cols) & set(self.mapping.keys()) == set(cols))):
                 tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
-                # print(src_df[cols].dtypes, tmp_df.dtypes)
                 for idx, col in enumerate(cols):
                     data[col] = tmp_df[idx]
+                # tmp = defaultdict(list)
+                # merge_arr = list(zip(*[src_df[x].values for x in cols]))
+                # for ele in map(self.funs[i], merge_arr):
+                #     for idx, col in enumerate(cols):
+                #         tmp[col].append(ele[idx])
+                # for col in cols:
+                #     data[col] = pandas.Series(tmp[col])
             else:
                 log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
                 sys.exit(1)
-        dst_df = pandas.DataFrame(data)[list(self.mapping.keys())]
-        print(len(data[i]), len(dst_df))
+        if self.unique:
+            print('src_df len:', len(src_df))
+            data[self.update] = src_df[self.update]
+            tmp_df = pandas.DataFrame(data)
+            print('tmp_df len:', len(tmp_df))
+            df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
+            tmp_df = df_sorted.drop_duplicates([self.unique])
+            # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
+        else:
+            tmp_df = pandas.DataFrame(data)
+        dst_df = tmp_df[list(self.mapping.keys())]
+        print('dst_df len:', len(dst_df))
         return dst_df
 
     def run(self, where=None, groupby=None, days=None):
@@ -222,7 +234,6 @@ class Etl(object):
                 log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
             else:
                 log.debug("dst data\n%s" % dst_df[:5])
-            # log.debug("dst data\n%s" % dst_df)
             yield dst_df
 
     @run_time
@@ -264,7 +275,7 @@ class Etl(object):
         if self.last_time:
             if self.job:
                 args = [dict(zip(columns, i)) for i in df.values]
-                self.dst_obj.merge(self.dst_tab, args, columns, self.unique)
+                self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
                 self.task.update(self.last_time)
             else:
                 args = list(map(tuple, df.values))

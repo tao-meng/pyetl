@@ -6,14 +6,16 @@ import datetime
 #     sys.path.insert(0, '..')
 from py_etl.utils import dtutil
 from py_etl.logger import log
+import re
 
 
 class TaskConfig(object):
 
     def __init__(self, src_table, dst_table, task_table="task"):
         self.db = connection('task.db', driver='sqlite3')
+        m = re.compile('\s+')
         self.task_table = task_table
-        self.src_table = src_table.lower()
+        self.src_table = m.sub('', src_table.lower())
         self.dst_table = dst_table.lower()
         self.init_db()
 
@@ -25,7 +27,7 @@ class TaskConfig(object):
     def init_db(self):
         sql = ("create table if not exists"
                " %s(id varchar(500) primary key,"
-               " src_table varchar(400),"
+               " src_table varchar(1000),"
                " dst_table varchar(100),"
                " date_type varchar(1),"
                " last_time varchar(20))") % self.task_table
@@ -34,7 +36,7 @@ class TaskConfig(object):
     def append(self, last_time=None):
         id = self.src_table + "||" + self.dst_table
         exist = self.db.query(
-            "select * from {} where id='{}'".format(self.task_table, id))
+            "select * from {} where id=:1".format(self.task_table), [id])
         if exist:
             return None
         if isinstance(last_time, datetime.datetime):
@@ -67,25 +69,21 @@ class TaskConfig(object):
             log.warn("days 参数为 0 全量重跑")
             self.db.insert(
                 "delete from {task_table} "
-                "where src_table='{src_table}' "
-                "and dst_table='{dst_table}'".format(
-                    task_table=self.task_table,
-                    src_table=self.src_table,
-                    dst_table=self.dst_table))
+                "where src_table=:1 "
+                "and dst_table=:1".format(task_table=self.task_table),
+                [self.src_table, self.dst_table])
             return (None, None)
         res = self.db.query(
             "select 1, last_time, date_type from {task_table} "
-            "where src_table='{src_table}' "
-            "and dst_table='{dst_table}'".format(
-                task_table=self.task_table,
-                src_table=self.src_table,
-                dst_table=self.dst_table))
+            "where src_table=:1 "
+            "and dst_table=:1".format(task_table=self.task_table),
+            [self.src_table, self.dst_table])
         if res:
             if res[0][1]:
                 if res[0][2]:
-                    dt = parse(dtutil.days_ago_str(res[0][1], delta=days))
+                    dt = parse(dtutil.days_ago_str(date=res[0][1], delta=days))
                 else:
-                    dt = dtutil.days_ago_str(res[0][1], delta=days)
+                    dt = dtutil.days_ago_str(date=res[0][1], delta=days)
             else:
                 dt = res[0][1]
             return res[0][0], dt
