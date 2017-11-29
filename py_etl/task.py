@@ -11,8 +11,9 @@ import re
 
 class TaskConfig(object):
 
-    def __init__(self, src_table, dst_table, task_table="task"):
-        self.db = connection('task.db', driver='sqlite3')
+    def __init__(self, src_table, dst_table, debug, task_table="task"):
+        # instance_log(self, debug)
+        self.db = connection('task.db', driver='sqlite3', debug=debug)
         m = re.compile('\s+')
         self.task_table = task_table
         self.src_table = m.sub('', src_table.lower())

@@ -1,7 +1,7 @@
 from collections import Iterator
 from py_db import connection
-import pandas
 from collections import defaultdict
+import pandas
 import sys
 import logging
 from py_etl.logger import log
@@ -62,10 +62,14 @@ class Etl(object):
     def _connect(self, uri):
         if isinstance(uri, str):
             return connection(uri, debug=self._debug)
-        else:
+        elif isinstance(uri, dict):
             uri = uri.copy()
-            args = [uri.pop('uri', ())]
-            return connection(*args, **uri, debug=self._debug)
+            debug = uri.get("debug", self._debug)
+            uri.pop("debug", None)
+            return connection(**uri, debug=debug)
+        else:
+            log.error("无效的数据库配置(%s)" % uri.__repr__())
+            sys.exit(1)
 
     def _create_obj(self, src_uri, dst_uri):
         # src_uri = Etl.src_uri if src_uri is None else src_uri
@@ -117,7 +121,7 @@ class Etl(object):
                 ][0][1]
 
     def generate_sql(self, where, groupby, days):
-        self.task = TaskConfig(self.src_tab, self.dst_tab)
+        self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
         if self.update:
             self.job, self.last_time = self.task.query(days)
         else:
@@ -194,17 +198,14 @@ class Etl(object):
                 log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
                 sys.exit(1)
         if self.unique:
-            print('src_df len:', len(src_df))
             data[self.update] = src_df[self.update]
             tmp_df = pandas.DataFrame(data)
-            print('tmp_df len:', len(tmp_df))
             df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
             tmp_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
         else:
             tmp_df = pandas.DataFrame(data)
         dst_df = tmp_df[list(self.mapping.keys())]
-        print('dst_df len:', len(dst_df))
         return dst_df
 
     def run(self, where=None, groupby=None, days=None):

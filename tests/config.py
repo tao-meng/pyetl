@@ -13,8 +13,8 @@ class Testing1Config:
 
 class Testing2Config:
     DEBUG = True
-    SRC_URI = "oracle://jwdn:password@local:1521/xe"
-    DST_URI = "oracle://jwdn:password@local:1521/xe"
+    SRC_URI = {"uri": "oracle://jwdn:password@local:1521/xe", "debug": True}
+    DST_URI = {"uri": "oracle://jwdn:password@local:1521/xe", "debug": False}
     # SRC_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
     # DST_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
 
@@ -27,5 +27,5 @@ class DevelopmentConfig:
 config = {
     'testing1': Testing1Config,
     'testing2': Testing2Config,
-    'default': DevelopmentConfig
+    'default': Testing2Config
 }
