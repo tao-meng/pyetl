@@ -4,7 +4,8 @@ console = logging.StreamHandler()
 formatter = logging.Formatter(
     # %(levelname)s %(module)s/%(name)s[line:%(lineno)d]: %(message)s'
     # '%(asctime)s %(levelname)s %(name)s.%(module)s: %(message)s',
-    '<%(asctime)s %(name)s.%(module)s> %(levelname)s: %(message)s',
+    # '<%(asctime)s %(levelname)s %(name)s> : %(message)s'
+    '<%(asctime)s %(levelname)s %(name)s.%(module)s> : %(message)s',
     '%Y-%m-%d %H:%M:%S'
 )
 console.setFormatter(formatter)
@@ -20,4 +21,6 @@ def print(*args, notice=''):
 if __name__ == '__main__':
     log.setLevel(logging.DEBUG)
     print('hello world')
+    log.info("log")
+    log.info("info")
     log.info("log info")

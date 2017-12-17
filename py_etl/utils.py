@@ -119,15 +119,14 @@ dtutil = DateUtility()
 
 
 if __name__ == "__main__":
-    # now = datetime.datetime.now()
-    # rs = dtutil.days_ago_str(date=now)
-    # rs2 = dtutil.days_ago()
-    # print(rs, rs2.__repr__())
-    #!/usr/bin/env python
-    # --*-- coding:utf-8 --*--
+    now = datetime.datetime.now()
+    rs = dtutil.days_ago_str(date=now)
+    rs2 = dtutil.days_ago()
+    print(rs, rs2.__repr__())
+
     import calendar
-    day_now = '20150222' #给定日期
-    day_begin = day_now[0:6]+'01' #月初肯定是1号 所以 直接替换 就可以
-    monthRange = calendar.monthrange(int(day_now[0:3]),int(day_now[4:6]))#得到本月的天数
+    day_now = '20150222'  # 给定日期
+    day_begin = day_now[0:6]+'01'  # 月初肯定是1号 所以 直接替换 就可以
+    monthRange = calendar.monthrange(int(day_now[0:3]), int(day_now[4:6]))  # 得到本月的天数
     day_end = day_now[0:6]+str(monthRange[1])
-    print(day_now,'月初日期为：',day_begin, '月末日期为：',day_end)
+    print(day_now, '月初日期为：', day_begin, '月末日期为：', day_end)

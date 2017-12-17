@@ -1,12 +1,16 @@
 from collections import Iterator
 from py_db import connection
-from collections import defaultdict
+# from collections import defaultdict
 import pandas
 import sys
 import logging
 from py_etl.logger import log
 from py_etl.utils import run_time, concat_place
 from py_etl.task import TaskConfig
+# pandas.set_option('display.height', 1000)
+# pandas.set_option('display.max_rows', 500)
+pandas.set_option('display.max_columns', 500)
+pandas.set_option('display.width', 1000)
 
 
 def upper(x):
@@ -19,8 +23,12 @@ def upper(x):
 
 def _change(func):
     def wrap(x):
-        rs = func(*[i for i in x])
-        return pandas.Series(list(rs))
+        try:
+            rs = func(*[i for i in x])
+            return pandas.Series(list(rs))
+        except Exception as r:
+            log.error('handle fun fail input: %s, output: %s' % (x, rs))
+            raise r
     return wrap
 
 
@@ -90,7 +98,8 @@ class Etl(object):
                 log.error("unique：%s 名称错误\nEXIT" % self.unique)
                 sys.exit(1)
         else:
-            self.unique = None
+            # self.unique = None 2.0.4 版本改动
+            self.unique = upper(unique) if unique else None
         if update:
             self.update = upper(update)
         else:
@@ -121,11 +130,16 @@ class Etl(object):
                 ][0][1]
 
     def generate_sql(self, where, groupby, days):
-        self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
+        """
+        生成数据查询sql
+        """
+        self.task = TaskConfig(self.src_tab, self.dst_tab)
+        # self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
         if self.update:
             self.job, self.last_time = self.task.query(days)
         else:
             self.job, self.last_time = None, None
+        self.last = self.last_time
         self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
@@ -161,6 +175,7 @@ class Etl(object):
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
             log.debug("src data\n%s" % src_df[:5])
+        log.debug("src type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
@@ -198,9 +213,12 @@ class Etl(object):
                 log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
                 sys.exit(1)
         if self.unique:
-            data[self.update] = src_df[self.update]
-            tmp_df = pandas.DataFrame(data)
-            df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
+            if self.update:
+                data[self.update] = src_df[self.update]
+                tmp_df = pandas.DataFrame(data)
+                df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
+            else:
+                df_sorted = pandas.DataFrame(data)
             tmp_df = df_sorted.drop_duplicates([self.unique])
             # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
         else:
@@ -209,6 +227,15 @@ class Etl(object):
         return dst_df
 
     def run(self, where=None, groupby=None, days=None):
+        """
+        数据处理任务执行
+        args:
+            where: 查询sql的过滤条件 example: where="id is not null"
+            groupby: 查询sql的group by 语句
+            days: 为0 表示全量重跑， 其他数字表示重新查询days天前的数据
+        return:
+            处理完成的数据 (generator object)
+        """
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
@@ -216,6 +243,8 @@ class Etl(object):
         log.debug("%s, Param: %s" % (sql, args))
         df_iterator = self.generate_dataframe(sql, args)
         for src_df in df_iterator:
+            # 替换 NaN 为None
+            # src_df = src_df.where(src_df.notnull(), None)
             column_upper = [i.upper() for i in list(src_df.columns)]
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
@@ -231,16 +260,21 @@ class Etl(object):
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
             # dst_df.info()
+            log.debug("dst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
             if len(dst_df) > 5:
                 log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
             else:
                 log.debug("dst data\n%s" % dst_df[:5])
+            # 替换 NaN 为None
+            dst_df = dst_df.where(dst_df.notnull(), None)
             yield dst_df
 
     @run_time
     def save(self, *args, on=''):
         """
-        合并数据入库
+        处理后的数据入库
+        args:
+            args:接收数据，格式是Iterable object
         """
         flag = None
         if len(args) == 1:
@@ -284,7 +318,12 @@ class Etl(object):
                 self.task.append(self.last_time)
         else:
             args = list(map(tuple, df.values))
-            self.dst_obj.insert(sql, args, num=self._insert_count)
-            self.task.append()
+            if self.unique:
+                args = [dict(zip(columns, i)) for i in df.values]
+                self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
+                self.task.append()
+            else:
+                self.dst_obj.insert(sql, args, num=self._insert_count)
+                self.task.append()
         self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))

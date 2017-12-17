@@ -5,7 +5,7 @@ __author__ = "lyt"
 """
     A python etl frame based on pandas and sqlalchemy
 """
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 
 __all__ = ['Etl']
 
