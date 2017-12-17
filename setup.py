@@ -27,6 +27,9 @@ setup(
     author_email='liyt@vastio.com',
     license='MIT',
     packages=find_packages(),
-    include_package_data=False,
-    zip_safe=True,
+    include_package_data=True,
+    zip_safe=False,
+    entry_points={
+        'console_scripts': ['etl = py_etl.cli:main']
+    }
 )
