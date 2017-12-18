@@ -1,4 +1,4 @@
-class Testing1Config:
+class TestingConfig:
     DEBUG = True
     # SRC_URI = {"uri": "DSN=mydb;UID=root;PWD=password", 'driver': 'pyodbc'}
     SRC_URI = {"uri": "DSN=mysqldb", 'driver': 'pyodbc'}
@@ -11,12 +11,22 @@ class Testing1Config:
     # CREATE_TABLE_FIELD_SIZE = 200
 
 
-class Testing2Config:
+class TestoracleConfig:
     DEBUG = True
-    SRC_URI = {"uri": "oracle://jwdn:password@local:1521/xe", "debug": True}
-    DST_URI = {"uri": "oracle://jwdn:password@local:1521/xe", "debug": False}
-    # SRC_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
-    # DST_URI = {"uri": "jwdn/password@local:1521/xe", "driver": "cx_Oracle"}
+    SRC_URI = {"uri": "oracle://jwdn:lyt@local:1521/xe", "debug": True}
+    DST_URI = {"uri": "oracle://jwdn:lyt@local:1521/xe", "debug": False}
+
+
+class TestFromfileConfig:
+    DEBUG = True
+    SRC_URI = {'file': 'PY_ETL_SRC.csv'}
+    DST_URI = "oracle://jwdn:lyt@local:1521/xe"
+
+
+class TestTofileConfig:
+    DEBUG = True
+    SRC_URI = "oracle://jwdn:lyt@local:1521/xe"
+    DST_URI = {'file': 'PY_ETL.csv'}
 
 
 class DevelopmentConfig:
@@ -25,7 +35,9 @@ class DevelopmentConfig:
 
 
 config = {
-    'testing1': Testing1Config,
-    'testing2': Testing2Config,
-    'default': Testing2Config
+    'testing': TestingConfig,
+    'fromfile': TestFromfileConfig,
+    'tofile': TestTofileConfig,
+    'oracle': TestoracleConfig,
+    'default': TestoracleConfig
 }

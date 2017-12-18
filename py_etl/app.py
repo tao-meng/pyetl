@@ -72,9 +72,16 @@ class Etl(object):
             return connection(uri, debug=self._debug)
         elif isinstance(uri, dict):
             uri = uri.copy()
-            debug = uri.get("debug", self._debug)
-            uri.pop("debug", None)
-            return connection(**uri, debug=debug)
+            if 'file' in uri:
+                if self.update:
+                    log.error('处理文件中数据时，update参数必须为空')
+                    sys.exit(1)
+                else:
+                    return uri['file']
+            else:
+                debug = uri.get("debug", self._debug)
+                uri.pop("debug", None)
+                return connection(**uri, debug=debug)
         else:
             log.error("无效的数据库配置(%s)" % uri.__repr__())
             sys.exit(1)
@@ -108,15 +115,19 @@ class Etl(object):
     def _handle_field(self):
         self.src_field = []
         self.src_field_name = []
+        self.src_field_dict = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
                 self.src_field_name.extend(j)
+                self.src_field_dict.update(
+                    {m: "{}{}".format(i, n) for n, m in enumerate(j)})
                 self.src_field.extend(
                     ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
                 self.mapping[i] = [
                     "{}{}".format(i, n) for n, m in enumerate(j)]
             else:
                 self.src_field_name.append(j)
+                self.src_field_dict[j] = i
                 self.src_field.append("{} as {}".format(j, i))
                 self.mapping[i] = i
         if self.update:
@@ -129,18 +140,12 @@ class Etl(object):
                     i.split(" as ") for i in self.src_field if self.update in i
                 ][0][1]
 
-    def generate_sql(self, where, groupby, days):
+    def generate_sql(self, where, groupby):
         """
         生成数据查询sql
         """
-        self.task = TaskConfig(self.src_tab, self.dst_tab)
-        # self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
-        if self.update:
-            self.job, self.last_time = self.task.query(days)
-        else:
-            self.job, self.last_time = None, None
-        self.last = self.last_time
-        self._handle_field()
+        # self._check_task(days)
+        # self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
         args = []
@@ -159,16 +164,6 @@ class Etl(object):
             sql.append(groupby)
         sql = ' '.join(sql)
         return sql, args
-
-    def generate_dataframe(self, sql, args):
-        """
-        获取源数据
-        """
-        df_iterator = pandas.read_sql(
-            sql, self.src_obj.connect,
-            params=args,
-            chunksize=self._query_count)
-        return df_iterator
 
     def _handle_data(self, src_df):
         if len(src_df) > 5:
@@ -210,7 +205,7 @@ class Etl(object):
                 # for col in cols:
                 #     data[col] = pandas.Series(tmp[col])
             else:
-                log.error("所添函数{}字段与实际字段不匹配\nEXIT".format(i))
+                log.error("所添函数'{}'字段与实际字段{}不匹配\nEXIT".format(i, self.mapping.keys()))
                 sys.exit(1)
         if self.unique:
             if self.update:
@@ -226,6 +221,34 @@ class Etl(object):
         dst_df = tmp_df[list(self.mapping.keys())]
         return dst_df
 
+    def _check_task(self, days):
+        self.task = TaskConfig(self.src_tab, self.dst_tab)
+        # self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
+        if self.update:
+            self.job, self.last_time = self.task.query(days)
+        else:
+            self.job, self.last_time = None, None
+        self.last = self.last_time
+
+    def generate_dataframe(self, where, groupby, days):
+        """
+        获取源数据
+        """
+        self._check_task(days)
+        self._handle_field()
+        if isinstance(self.src_obj, str):
+            df_iterator = pandas.read_csv(
+                self.src_obj,
+                chunksize=self._query_count)
+        else:
+            sql, args = self.generate_sql(where, groupby)
+            log.debug("%s, Param: %s" % (sql, args))
+            df_iterator = pandas.read_sql(
+                sql, self.src_obj.connect,
+                params=args,
+                chunksize=self._query_count)
+        return df_iterator
+
     def run(self, where=None, groupby=None, days=None):
         """
         数据处理任务执行
@@ -239,13 +262,14 @@ class Etl(object):
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
-        sql, args = self.generate_sql(where, groupby, days)
-        log.debug("%s, Param: %s" % (sql, args))
-        df_iterator = self.generate_dataframe(sql, args)
+        df_iterator = self.generate_dataframe(where, groupby, days)
         for src_df in df_iterator:
             # 替换 NaN 为None
             # src_df = src_df.where(src_df.notnull(), None)
-            column_upper = [i.upper() for i in list(src_df.columns)]
+            if isinstance(self.src_obj, str):
+                column_upper = [self.src_field_dict[i].upper() for i in list(src_df.columns)]
+            else:
+                column_upper = [i.upper() for i in list(src_df.columns)]
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
@@ -303,27 +327,30 @@ class Etl(object):
         保存数据
         记录最后更新的时间点
         """
-        columns = list(df.columns)
-        sql = "insert into %s(%s) values(%s)" % (
-            self.dst_tab, ','.join(columns),
-            concat_place(columns, place=self._dst_place))
-        if self.last_time:
-            if self.job:
-                args = [dict(zip(columns, i)) for i in df.values]
-                self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
-                self.task.update(self.last_time)
+        if isinstance(self.dst_obj, str):
+            df.to_csv(self.dst_obj, index=False)
+        else:
+            columns = list(df.columns)
+            sql = "insert into %s(%s) values(%s)" % (
+                self.dst_tab, ','.join(columns),
+                concat_place(columns, place=self._dst_place))
+            if self.last_time:
+                if self.job:
+                    args = [dict(zip(columns, i)) for i in df.values]
+                    self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
+                    self.task.update(self.last_time)
+                else:
+                    args = list(map(tuple, df.values))
+                    self.dst_obj.insert(sql, args, num=self._insert_count)
+                    self.task.append(self.last_time)
             else:
                 args = list(map(tuple, df.values))
-                self.dst_obj.insert(sql, args, num=self._insert_count)
-                self.task.append(self.last_time)
-        else:
-            args = list(map(tuple, df.values))
-            if self.unique:
-                args = [dict(zip(columns, i)) for i in df.values]
-                self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
-                self.task.append()
-            else:
-                self.dst_obj.insert(sql, args, num=self._insert_count)
-                self.task.append()
-        self.dst_obj.commit()
+                if self.unique:
+                    args = [dict(zip(columns, i)) for i in df.values]
+                    self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
+                    self.task.append()
+                else:
+                    self.dst_obj.insert(sql, args, num=self._insert_count)
+                    self.task.append()
+            self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))

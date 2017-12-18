@@ -30,6 +30,6 @@ setup(
     include_package_data=True,
     zip_safe=False,
     entry_points={
-        'console_scripts': ['etl = py_etl.cli:main']
+        'console_scripts': ['pyetl = py_etl.cli:main']
     }
 )

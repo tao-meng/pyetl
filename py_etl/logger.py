@@ -5,7 +5,7 @@ formatter = logging.Formatter(
     # %(levelname)s %(module)s/%(name)s[line:%(lineno)d]: %(message)s'
     # '%(asctime)s %(levelname)s %(name)s.%(module)s: %(message)s',
     # '<%(asctime)s %(levelname)s %(name)s> : %(message)s'
-    '<%(asctime)s %(levelname)s %(name)s.%(module)s> : %(message)s',
+    '<%(asctime)s %(name)s.%(module)s %(levelname)s> %(message)s',
     '%Y-%m-%d %H:%M:%S'
 )
 console.setFormatter(formatter)
