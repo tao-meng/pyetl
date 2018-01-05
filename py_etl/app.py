@@ -15,7 +15,6 @@ pandas.set_option('display.width', 1000)
 
 def upper(x):
     if isinstance(x, list):
-        # return [i.upper() for i in x]
         return tuple([i.upper() for i in x])
     else:
         return x.upper()
@@ -113,6 +112,9 @@ class Etl(object):
             self.update = None
 
     def _handle_field(self):
+        """
+        字段名称处理
+        """
         self.src_field = []
         self.src_field_name = []
         self.src_field_dict = {}
@@ -166,6 +168,13 @@ class Etl(object):
         return sql, args
 
     def _handle_data(self, src_df):
+        """
+        数据处理
+        Args:
+            src_df: dataframe
+        return:
+            dataframe
+        """
         if len(src_df) > 5:
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
@@ -237,9 +246,13 @@ class Etl(object):
         self._check_task(days)
         self._handle_field()
         if isinstance(self.src_obj, str):
-            df_iterator = pandas.read_csv(
-                self.src_obj,
-                chunksize=self._query_count)
+            if self.src_tab=='csv':
+                df_iterator = pandas.read_csv(
+                    self.src_obj,
+                    chunksize=self._query_count)
+            else:
+                log.error("文件类型'{}'不支持".format(self.src_tab))
+                sys.exit()
         else:
             sql, args = self.generate_sql(where, groupby)
             log.debug("%s, Param: %s" % (sql, args))
@@ -328,7 +341,11 @@ class Etl(object):
         记录最后更新的时间点
         """
         if isinstance(self.dst_obj, str):
-            df.to_csv(self.dst_obj, index=False)
+            if self.dst_tab=='csv':
+                df.to_csv(self.dst_obj, index=False)
+            else:
+                log.error("文件类型'{}'不支持".format(self.dst_tab))
+                sys.exit()
         else:
             columns = list(df.columns)
             sql = "insert into %s(%s) values(%s)" % (

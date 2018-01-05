@@ -5,7 +5,7 @@ from env_config import env_config
 
 
 def task_fromfile():
-    src_tab = ''
+    src_tab = 'csv'
     dst_tab = 'py_etl_src'
     dst_unique = 'id'
     mapping = {'id': 'id', 'foo': 'foo', 'date_time': 'date_time',
@@ -30,7 +30,7 @@ def task_oracle():
 
 def task_tofile():
     src_tab = 'py_etl_src'
-    dst_tab = ''
+    dst_tab = 'csv'
     dst_unique = 'id'
     mapping = {'id': 'id', 'bar': 'foo', 'update_time': 'date_time',
                'lon': 'x', 'lat': 'y'}
