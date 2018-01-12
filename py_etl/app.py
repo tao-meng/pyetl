@@ -26,7 +26,7 @@ def _change(func):
             rs = func(*[i for i in x])
             return pandas.Series(list(rs))
         except Exception as r:
-            log.error('handle fun fail input: %s, output: %s' % (x, rs))
+            log.error('\nhandle fun fail input:\n%s' % (x))
             raise r
     return wrap
 
@@ -94,6 +94,7 @@ class Etl(object):
         self.src_tab = src_tab
         self.dst_tab = dst_tab
         self.is_config = False
+        self.mapping_src = {upper(i): j for i, j in mapping.items()}
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
         # self.funs = {i: lambda x: x for i in self.mapping}
         self.funs = {}
@@ -123,14 +124,16 @@ class Etl(object):
                 self.src_field_name.extend(j)
                 self.src_field_dict.update(
                     {m: "{}{}".format(i, n) for n, m in enumerate(j)})
+                # self.src_field.extend(
+                #     ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
                 self.src_field.extend(
-                    ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
+                    ["{} as {}{}".format(m, i, n) for n, m in enumerate(self.mapping_src[i])])
                 self.mapping[i] = [
                     "{}{}".format(i, n) for n, m in enumerate(j)]
             else:
                 self.src_field_name.append(j)
                 self.src_field_dict[j] = i
-                self.src_field.append("{} as {}".format(j, i))
+                self.src_field.append("{} as {}".format(self.mapping_src[i], i))
                 self.mapping[i] = i
         if self.update:
             self.update_old = self.update
@@ -138,8 +141,11 @@ class Etl(object):
                 self.src_field.append("%s as etl_update_flag" % self.update)
                 self.update = "etl_update_flag".upper()
             else:
+                # self.update = [
+                #     i.split(" as ") for i in self.src_field if self.update in i
+                # ][0][1]
                 self.update = [
-                    i.split(" as ") for i in self.src_field if self.update in i
+                    i.split(" as ") for i in self.src_field if self.update in i.upper()
                 ][0][1]
 
     def generate_sql(self, where, groupby):
@@ -186,7 +192,7 @@ class Etl(object):
                 merge_arr = map(list, zip(*[src_df[x] for x in j]))
                 # merge_arr = list(zip(*[src_df[x].values for x in j]))
                 if i in self.funs:
-                    data[i] = pandas.Series(merge_arr).map(self.funs[i])
+                    data[i] = pandas.Series(merge_arr).map(self.funs[i]).astype('object')
                     # data[i] = pandas.Series((map(self.funs[i], merge_arr)))
                     self.funs.pop(i)
                 else:
@@ -194,18 +200,18 @@ class Etl(object):
                     sys.exit(1)
             else:
                 if i in self.funs:
-                    data[i] = src_df[i].map(self.funs[i])
+                    data[i] = src_df[i].map(self.funs[i]).astype('object')
                     # data[i] = pandas.Series(map(self.funs[i], src_df[i].values))
                     self.funs.pop(i)
                 else:
-                    data[i] = src_df[i]
+                    data[i] = src_df[i].astype('object')
         for i in self.funs:
             cols = list(i)
             if (isinstance(i, (tuple, list)) and
                     (set(cols) & set(self.mapping.keys()) == set(cols))):
                 tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
                 for idx, col in enumerate(cols):
-                    data[col] = tmp_df[idx]
+                    data[col] = tmp_df[idx].astype('object')
                 # tmp = defaultdict(list)
                 # merge_arr = list(zip(*[src_df[x].values for x in cols]))
                 # for ele in map(self.funs[i], merge_arr):
@@ -218,7 +224,7 @@ class Etl(object):
                 sys.exit(1)
         if self.unique:
             if self.update:
-                data[self.update] = src_df[self.update]
+                data[self.update] = src_df[self.update].astype('object')
                 tmp_df = pandas.DataFrame(data)
                 df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
             else:
@@ -298,12 +304,16 @@ class Etl(object):
             dst_df = self._handle_data(src_df)
             # dst_df.info()
             log.debug("dst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
+            # if len(dst_df) > 5:
+            #     log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
+            # else:
+            #     log.debug("dst data\n%s" % dst_df[:5])
+            # NaN值处理： 替换 NaN 为None
+            dst_df = dst_df.where(dst_df.notnull(), None)
             if len(dst_df) > 5:
                 log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
             else:
                 log.debug("dst data\n%s" % dst_df[:5])
-            # 替换 NaN 为None
-            dst_df = dst_df.where(dst_df.notnull(), None)
             yield dst_df
 
     @run_time
