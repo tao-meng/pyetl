@@ -2,7 +2,7 @@ class TestingConfig:
     DEBUG = True
     # SRC_URI = {"uri": "DSN=mydb;UID=root;PWD=password", 'driver': 'pyodbc'}
     SRC_URI = {"uri": "DSN=mysqldb", 'driver': 'pyodbc'}
-    DST_URI = "oracle://jwdn:password@local:1521/xe"
+    DST_URI = "oracle://jwdn:jwdn@local:1521/xe"
     SRC_PLACEHOLDER = "?"
     # DST_PLACEHOLDER = ":1"
     # TASK_TABLE = 'task'
@@ -13,19 +13,19 @@ class TestingConfig:
 
 class TestoracleConfig:
     DEBUG = True
-    SRC_URI = {"uri": "oracle://jwdn:lyt@local:1521/xe", "debug": True}
-    DST_URI = {"uri": "oracle://jwdn:lyt@local:1521/xe", "debug": False}
+    SRC_URI = {"uri": "oracle://jwdn:jwdn@local:1521/xe", "debug": True}
+    DST_URI = {"uri": "oracle://jwdn:jwdn@local:1521/xe", "debug": False}
 
 
 class TestFromfileConfig:
     DEBUG = True
     SRC_URI = {'file': 'PY_ETL_SRC.csv'}
-    DST_URI = "oracle://jwdn:lyt@local:1521/xe"
+    DST_URI = "oracle://jwdn:jwdn@local:1521/xe"
 
 
 class TestTofileConfig:
     DEBUG = True
-    SRC_URI = "oracle://jwdn:lyt@local:1521/xe"
+    SRC_URI = "oracle://jwdn:jwdn@local:1521/xe"
     DST_URI = {'file': 'PY_ETL.csv'}
 
 

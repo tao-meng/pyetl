@@ -1,6 +1,5 @@
 from collections import Iterator
 from py_db import connection
-# from collections import defaultdict
 import pandas
 import sys
 import logging
@@ -37,7 +36,7 @@ class Etl(object):
     _task_table = 'py_script_task'
     _query_count = 2000000
     _insert_count = 200000
-    _field_size = 200
+    _field_size = 200   # 已废弃
     _debug = False
 
     def config(self, cfg):
@@ -86,15 +85,13 @@ class Etl(object):
             sys.exit(1)
 
     def _create_obj(self, src_uri, dst_uri):
-        # src_uri = Etl.src_uri if src_uri is None else src_uri
-        # dst_uri = Etl.dst_uri if dst_uri is None else dst_uri
         return self._connect(src_uri), self._connect(dst_uri)
 
     def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
         self.src_tab = src_tab
         self.dst_tab = dst_tab
         self.is_config = False
-        self.mapping_src = {upper(i): j for i, j in mapping.items()}
+        self.src_mapping = {upper(i): j for i, j in mapping.items()}
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
         # self.funs = {i: lambda x: x for i in self.mapping}
         self.funs = {}
@@ -112,7 +109,7 @@ class Etl(object):
         else:
             self.update = None
 
-    def _handle_field(self):
+    def _handle_field_name(self):
         """
         字段名称处理
         """
@@ -124,16 +121,14 @@ class Etl(object):
                 self.src_field_name.extend(j)
                 self.src_field_dict.update(
                     {m: "{}{}".format(i, n) for n, m in enumerate(j)})
-                # self.src_field.extend(
-                #     ["{} as {}{}".format(m, i, n) for n, m in enumerate(j)])
                 self.src_field.extend(
-                    ["{} as {}{}".format(m, i, n) for n, m in enumerate(self.mapping_src[i])])
+                    ["{} as {}{}".format(m, i, n) for n, m in enumerate(self.src_mapping[i])])
                 self.mapping[i] = [
                     "{}{}".format(i, n) for n, m in enumerate(j)]
             else:
                 self.src_field_name.append(j)
                 self.src_field_dict[j] = i
-                self.src_field.append("{} as {}".format(self.mapping_src[i], i))
+                self.src_field.append("{} as {}".format(self.src_mapping[i], i))
                 self.mapping[i] = i
         if self.update:
             self.update_old = self.update
@@ -141,19 +136,17 @@ class Etl(object):
                 self.src_field.append("%s as etl_update_flag" % self.update)
                 self.update = "etl_update_flag".upper()
             else:
-                # self.update = [
-                #     i.split(" as ") for i in self.src_field if self.update in i
-                # ][0][1]
                 self.update = [
                     i.split(" as ") for i in self.src_field if self.update in i.upper()
                 ][0][1]
 
-    def generate_sql(self, where, groupby):
+    def _gen_sql(self, where, groupby):
         """
-        生成数据查询sql
+        生成数据查询sql语句
+        :param where: sql语句中where 筛选条件
+        :param groupby: sql语句中group by分组条件
+        :return: sql, args
         """
-        # self._check_task(days)
-        # self._handle_field()
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
         args = []
@@ -176,24 +169,20 @@ class Etl(object):
     def _handle_data(self, src_df):
         """
         数据处理
-        Args:
-            src_df: dataframe
-        return:
-            dataframe
+        :param src_df: dataframe from source data
+        :return: handled dataframe by function added
         """
         if len(src_df) > 5:
             log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
         else:
             log.debug("src data\n%s" % src_df[:5])
-        log.debug("src type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
+        log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
-                merge_arr = map(list, zip(*[src_df[x] for x in j]))
-                # merge_arr = list(zip(*[src_df[x].values for x in j]))
+                merged_array = map(list, zip(*[src_df[x] for x in j]))
                 if i in self.funs:
-                    data[i] = pandas.Series(merge_arr).map(self.funs[i]).astype('object')
-                    # data[i] = pandas.Series((map(self.funs[i], merge_arr)))
+                    data[i] = pandas.Series(merged_array).map(self.funs[i]).astype('object')
                     self.funs.pop(i)
                 else:
                     log.error("'{}'字段是一个列表需要添加处理函数\nEXIT".format(i))
@@ -201,7 +190,6 @@ class Etl(object):
             else:
                 if i in self.funs:
                     data[i] = src_df[i].map(self.funs[i]).astype('object')
-                    # data[i] = pandas.Series(map(self.funs[i], src_df[i].values))
                     self.funs.pop(i)
                 else:
                     data[i] = src_df[i].astype('object')
@@ -212,13 +200,6 @@ class Etl(object):
                 tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
                 for idx, col in enumerate(cols):
                     data[col] = tmp_df[idx].astype('object')
-                # tmp = defaultdict(list)
-                # merge_arr = list(zip(*[src_df[x].values for x in cols]))
-                # for ele in map(self.funs[i], merge_arr):
-                #     for idx, col in enumerate(cols):
-                #         tmp[col].append(ele[idx])
-                # for col in cols:
-                #     data[col] = pandas.Series(tmp[col])
             else:
                 log.error("所添函数'{}'字段与实际字段{}不匹配\nEXIT".format(i, self.mapping.keys()))
                 sys.exit(1)
@@ -226,65 +207,64 @@ class Etl(object):
             if self.update:
                 data[self.update] = src_df[self.update].astype('object')
                 tmp_df = pandas.DataFrame(data)
-                df_sorted = tmp_df.sort_values(by=self.update, ascending=False)
+                sorted_df = tmp_df.sort_values(by=self.update, ascending=False)
             else:
-                df_sorted = pandas.DataFrame(data)
-            tmp_df = df_sorted.drop_duplicates([self.unique])
-            # df_drop = df_sorted.iloc[~df_sorted.index.isin(src_df.index)]
+                sorted_df = pandas.DataFrame(data)
+            tmp_df = sorted_df.drop_duplicates([self.unique])
+            # 获取删除部分的数据
+            # droped_df = sorted_df.iloc[~sorted_df.index.isin(src_df.index)]
         else:
             tmp_df = pandas.DataFrame(data)
         dst_df = tmp_df[list(self.mapping.keys())]
         return dst_df
 
-    def _check_task(self, days):
+    def _query_task_info(self, days):
+        """
+        查询当前任务的历史更新时间点
+        """
         self.task = TaskConfig(self.src_tab, self.dst_tab)
-        # self.task = TaskConfig(self.src_tab, self.dst_tab, self._debug)
         if self.update:
             self.job, self.last_time = self.task.query(days)
         else:
             self.job, self.last_time = None, None
         self.last = self.last_time
 
-    def generate_dataframe(self, where, groupby, days):
+    def _gen_df_from_source(self, where, groupby, days):
         """
         获取源数据
         """
-        self._check_task(days)
-        self._handle_field()
+        self._query_task_info(days)
+        self._handle_field_name()
         if isinstance(self.src_obj, str):
             if self.src_tab=='csv':
-                df_iterator = pandas.read_csv(
+                iter_df = pandas.read_csv(
                     self.src_obj,
                     chunksize=self._query_count)
             else:
                 log.error("文件类型'{}'不支持".format(self.src_tab))
                 sys.exit()
         else:
-            sql, args = self.generate_sql(where, groupby)
+            sql, args = self._gen_sql(where, groupby)
             log.debug("%s, Param: %s" % (sql, args))
-            df_iterator = pandas.read_sql(
+            iter_df = pandas.read_sql(
                 sql, self.src_obj.connect,
                 params=args,
                 chunksize=self._query_count)
-        return df_iterator
+        return iter_df
 
     def run(self, where=None, groupby=None, days=None):
         """
         数据处理任务执行
-        args:
-            where: 查询sql的过滤条件 example: where="id is not null"
-            groupby: 查询sql的group by 语句
-            days: 为0 表示全量重跑， 其他数字表示重新查询days天前的数据
-        return:
-            处理完成的数据 (generator object)
+        :param where: 查询sql的过滤条件 example: where="id is not null"
+        :param groupby: 查询sql的group by 语句
+        :param days: 为0 表示全量重跑， 其他数字表示重新查询days天前的数据
+        :return: 处理完成的数据 (generator object)
         """
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
-        df_iterator = self.generate_dataframe(where, groupby, days)
-        for src_df in df_iterator:
-            # 替换 NaN 为None
-            # src_df = src_df.where(src_df.notnull(), None)
+        iter_df = self._gen_df_from_source(where, groupby, days)
+        for src_df in iter_df:
             if isinstance(self.src_obj, str):
                 column_upper = [self.src_field_dict[i].upper() for i in list(src_df.columns)]
             else:
@@ -294,61 +274,54 @@ class Etl(object):
                 inplace=True)
             # log.debug("src data\n%s\n..." % src_df[:5])
             if self.update:
-                # print((src_df[self.update].dtypes))
-                # src_df[self.update] = src_df[self.update].astype(
-                #     'datetime64[ns]')
-                # print((src_df[self.update].dtypes))
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
             # dst_df.info()
-            log.debug("dst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
-            # if len(dst_df) > 5:
-            #     log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
-            # else:
-            #     log.debug("dst data\n%s" % dst_df[:5])
+            log.debug("\ndst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
             # NaN值处理： 替换 NaN 为None
             dst_df = dst_df.where(dst_df.notnull(), None)
             if len(dst_df) > 5:
                 log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
             else:
                 log.debug("dst data\n%s" % dst_df[:5])
+            # import pdb
+            # pdb.set_trace()
             yield dst_df
 
     @run_time
     def save(self, *args, on=''):
         """
-        处理后的数据入库
-        args:
-            args:接收数据，格式是Iterable object
+        数据保存
+        :param args: 接收要保存的数据(Iterable object)， 多组数据会依次根据on参数合并
+        :param on: args为多组数据是必选，作为数据合并的依据
         """
         flag = None
         if len(args) == 1:
             for df in args[0]:
                 flag = True
-                self._to_save(df)
+                self._save_df(df)
             else:
                 log.info('没有数据更新') if flag is None else None
         else:
             if not on:
                 log.error("join多个dataframe需要参数on \n"
-                          "example job.join(rs1, rs2, rs3, on=['id'])"
+                          "example app.join(rs1, rs2, rs3, on=['id'])"
                           "\nEXIT")
                 sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
                 rs = pandas.merge(*args, on=on, how='outer')
-                self._to_save(rs)
+                self._save_df(rs)
             else:
                 rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 new_args = (rs,) + args[2:]
                 self.join(*new_args, on=on)
 
-    def _to_save(self, df):
+    def _save_df(self, df):
         """
-        保存数据
-        记录最后更新的时间点
+        保存数据并记录最后更新的时间点
         """
         if isinstance(self.dst_obj, str):
             if self.dst_tab=='csv':

@@ -42,7 +42,7 @@ def task_tofile():
 def main():
     with env_config():
         task_fromfile()
-        task_oracle()
+        # task_oracle()
         task_tofile()
 
 
