@@ -1,6 +1,7 @@
 from collections import Iterator
 from py_db import connection
 import pandas
+import types
 import sys
 import logging
 from py_etl.logger import log
@@ -34,9 +35,9 @@ class Etl(object):
     _src_place = ":1"
     _dst_place = ":1"
     _task_table = 'py_script_task'
-    _query_count = 2000000
-    _insert_count = 200000
-    _field_size = 200   # 已废弃
+    _query_count = 1000000
+    _insert_count = 100000
+    _field_size = 100   # 已废弃
     _debug = False
 
     def config(self, cfg):
@@ -55,6 +56,7 @@ class Etl(object):
         if self.src_uri is None or self.dst_uri is None:
             log.error('没有配置数据库uri\nEXIT')
             sys.exit(1)
+        # TODO: 功能改惰性连接，实现配置动态修改 (TodoReview)
         self.src_obj, self.dst_obj = self._create_obj(
             self.src_uri, self.dst_uri)
         self.db = self.dst_obj
@@ -88,29 +90,30 @@ class Etl(object):
         return self._connect(src_uri), self._connect(dst_uri)
 
     def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
+        self.is_config = False
         self.src_tab = src_tab
         self.dst_tab = dst_tab
-        self.is_config = False
+        self.update = upper(unique) if unique else None
+        self.unique = upper(unique) if unique else None
         self.src_mapping = {upper(i): j for i, j in mapping.items()}
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
-        # self.funs = {i: lambda x: x for i in self.mapping}
         self.funs = {}
-        if unique and update:
-            unique = upper(unique)
-            if unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique)):
-                self.unique = unique
-            # if upper(unique) in self.mapping:
-                # self.unique = upper(unique)
-            else:
-                log.error("unique：%s 名称错误\nEXIT" % self.unique)
-                sys.exit(1)
-        else:
-            # self.unique = None 2.0.4 版本改动
-            self.unique = upper(unique) if unique else None
-        if update:
-            self.update = upper(update)
-        else:
-            self.update = None
+        if not (unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique))):
+            log.error("unique：%s 名称错误\nEXIT" % self.unique)
+            sys.exit(1)
+        # if unique and update:
+        #     # unique = upper(unique)
+        #     if unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique)):
+        #         self.unique = unique
+        #     else:
+        #         log.error("unique：%s 名称错误\nEXIT" % self.unique)
+        #         sys.exit(1)
+        # else:
+        #     self.unique = upper(unique) if unique else None
+        # if update:
+        #     self.update = upper(update)
+        # else:
+        #     self.update = None
 
     def _handle_field_name(self):
         """
@@ -176,11 +179,6 @@ class Etl(object):
         :param src_df: dataframe from source data
         :return: handled dataframe by function added
         """
-        # if len(src_df) > 5:
-        #     log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
-        # else:
-        #     log.debug("src data\n%s" % src_df[:5])
-        # log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
@@ -262,6 +260,12 @@ class Etl(object):
                 chunksize=self._query_count)
         return iter_df
 
+    def print(self, descr, df):
+        if len(df) > 5:
+            log.debug("%s\n%s\n\t\t\t\t......" % (descr, df[:5]))
+        else:
+            log.debug("%s\n%s" % (descr, df[:5]))
+
     def run(self, where=None, groupby=None, days=None):
         """
         数据处理任务执行
@@ -273,9 +277,7 @@ class Etl(object):
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
-        # self.src_obj, self.dst_obj = self._create_obj(
-        #     self.src_uri, self.dst_uri)
-        # self.db = self.dst_obj
+        self.setUp()
         iter_df = self._gen_df_from_source(where, groupby, days)
         for src_df in iter_df:
             if isinstance(self.src_obj, str):
@@ -285,24 +287,27 @@ class Etl(object):
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
-            if len(src_df) > 5:
-                log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
-            else:
-                log.debug("src data\n%s" % src_df[:5])
-            log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
+            # if len(src_df) > 5:
+            #     log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
+            # else:
+            #     log.debug("src data\n%s" % src_df[:5])
+            self.print('src data', src_df)
+            self.print('src type', pandas.DataFrame(src_df.dtypes).T)
+            # log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
             if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
-            # dst_df.info()
-            log.debug("\ndst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
+            # log.debug("\ndst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
             # NaN值处理： 替换 NaN 为None
             dst_df = dst_df.where(dst_df.notnull(), None)
-            if len(dst_df) > 5:
-                log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
-            else:
-                log.debug("dst data\n%s" % dst_df[:5])
+            self.print('dst type', pandas.DataFrame(dst_df.dtypes).T)
+            self.print('src data', src_df)
+            # if len(dst_df) > 5:
+            #     log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
+            # else:
+            #     log.debug("dst data\n%s" % dst_df[:5])
             # import pdb
             # pdb.set_trace()
             yield dst_df
@@ -324,8 +329,7 @@ class Etl(object):
         else:
             if not on:
                 log.error("join多个dataframe需要参数on \n"
-                          "example app.join(rs1, rs2, rs3, on=['id'])"
-                          "\nEXIT")
+                          "example app.join(rs1, rs2, rs3, on=['id'])\nEXIT")
                 sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
@@ -369,5 +373,18 @@ class Etl(object):
                 else:
                     self.dst_obj.insert(sql, args, num=self._insert_count)
                     self.task.append()
+            self.tearDown()
             self.dst_obj.commit()
         log.info('插入数量：%s' % len(df))
+
+    def after(self, func):
+        self.tearDown = types.MethodType(func, self)
+
+    def before(self, func):
+        self.setUp = types.MethodType(func, self)
+
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
