@@ -13,7 +13,7 @@ pandas.set_option('display.width', 1000)
 
 
 def upper(x):
-    if isinstance(x, list):
+    if isinstance(x, (list, tuple)):
         return tuple([i.upper() for i in x])
     else:
         return x.upper()
@@ -96,8 +96,11 @@ class Etl(object):
         # self.funs = {i: lambda x: x for i in self.mapping}
         self.funs = {}
         if unique and update:
-            if upper(unique) in self.mapping:
-                self.unique = upper(unique)
+            unique = upper(unique)
+            if unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique)):
+                self.unique = unique
+            # if upper(unique) in self.mapping:
+                # self.unique = upper(unique)
             else:
                 log.error("unique：%s 名称错误\nEXIT" % self.unique)
                 sys.exit(1)
@@ -137,8 +140,9 @@ class Etl(object):
                 self.update = "etl_update_flag".upper()
             else:
                 self.update = [
-                    i.split(" as ") for i in self.src_field if self.update in i.upper()
+                    i.split(" as ") for i in self.src_field if self.update == i.split(" as ")[0].upper()
                 ][0][1]
+                print("update_name: ", self.update)
 
     def _gen_sql(self, where, groupby):
         """
@@ -172,11 +176,11 @@ class Etl(object):
         :param src_df: dataframe from source data
         :return: handled dataframe by function added
         """
-        if len(src_df) > 5:
-            log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
-        else:
-            log.debug("src data\n%s" % src_df[:5])
-        log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
+        # if len(src_df) > 5:
+        #     log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
+        # else:
+        #     log.debug("src data\n%s" % src_df[:5])
+        # log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
         data = {}
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
@@ -210,7 +214,13 @@ class Etl(object):
                 sorted_df = tmp_df.sort_values(by=self.update, ascending=False)
             else:
                 sorted_df = pandas.DataFrame(data)
-            tmp_df = sorted_df.drop_duplicates([self.unique])
+            if isinstance(self.unique, (list, tuple)):
+                self._list_unique = list(self.unique)
+            elif isinstance(self.unique, str):
+                self._list_unique = [self.unique]
+            else:
+                raise TypeError("invild unique config, must be list or str")
+            tmp_df = sorted_df.drop_duplicates(self._list_unique)
             # 获取删除部分的数据
             # droped_df = sorted_df.iloc[~sorted_df.index.isin(src_df.index)]
         else:
@@ -263,6 +273,9 @@ class Etl(object):
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
+        # self.src_obj, self.dst_obj = self._create_obj(
+        #     self.src_uri, self.dst_uri)
+        # self.db = self.dst_obj
         iter_df = self._gen_df_from_source(where, groupby, days)
         for src_df in iter_df:
             if isinstance(self.src_obj, str):
@@ -272,7 +285,11 @@ class Etl(object):
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
-            # log.debug("src data\n%s\n..." % src_df[:5])
+            if len(src_df) > 5:
+                log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
+            else:
+                log.debug("src data\n%s" % src_df[:5])
+            log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
             if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
