@@ -47,7 +47,7 @@ class TaskConfig(object):
             "values(:1,:1,:1,:1,:1)" % self.task_table,
             [id, last_time, date_type, self.src_table, self.dst_table]
         )
-        self.db.commit()
+        # self.db.commit()
 
     def update(self, last_time):
         if isinstance(last_time, datetime.datetime):
@@ -60,7 +60,7 @@ class TaskConfig(object):
             "where src_table=:1 and dst_table=:1" % self.task_table,
             [last_time, date_type, self.src_table, self.dst_table]
         )
-        self.db.commit()
+        # self.db.commit()
 
     def query(self, days=None):
         if days == 0:
@@ -88,6 +88,8 @@ class TaskConfig(object):
         else:
             return (None, None)
 
+    def commit(self):
+        self.db.commit()
 
 if __name__ == "__main__":
     job = TaskConfig("tab1", "tab2")

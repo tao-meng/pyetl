@@ -91,14 +91,15 @@ class Etl(object):
 
     def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
         self.is_config = False
+        self.is_saving = False
         self.src_tab = src_tab
         self.dst_tab = dst_tab
-        self.update = upper(unique) if unique else None
+        self.update = upper(update) if update else None
         self.unique = upper(unique) if unique else None
         self.src_mapping = {upper(i): j for i, j in mapping.items()}
         self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
         self.funs = {}
-        if not (unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique))):
+        if not (self.unique in self.mapping or ((set(self.unique) & set(self.mapping.keys())) == set(self.unique))):
             log.error("unique：%s 名称错误\nEXIT" % self.unique)
             sys.exit(1)
         # if unique and update:
@@ -287,27 +288,16 @@ class Etl(object):
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
-            # if len(src_df) > 5:
-            #     log.debug("src data\n%s\n\t\t\t\t......" % src_df[:5])
-            # else:
-            #     log.debug("src data\n%s" % src_df[:5])
             self.print('src data', src_df)
             self.print('src type', pandas.DataFrame(src_df.dtypes).T)
-            # log.debug("\nsrc type:\n%s" % pandas.DataFrame(src_df.dtypes).T)
-            if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
             dst_df = self._handle_data(src_df)
-            # log.debug("\ndst type:\n%s" % pandas.DataFrame(dst_df.dtypes).T)
             # NaN值处理： 替换 NaN 为None
             dst_df = dst_df.where(dst_df.notnull(), None)
             self.print('dst type', pandas.DataFrame(dst_df.dtypes).T)
-            self.print('src data', src_df)
-            # if len(dst_df) > 5:
-            #     log.debug("dst data\n%s\n\t\t\t\t......" % dst_df[:5])
-            # else:
-            #     log.debug("dst data\n%s" % dst_df[:5])
+            self.print('dst data', dst_df)
             # import pdb
             # pdb.set_trace()
             yield dst_df
@@ -319,6 +309,8 @@ class Etl(object):
         :param args: 接收要保存的数据(Iterable object)， 多组数据会依次根据on参数合并
         :param on: args为多组数据是必选，作为数据合并的依据
         """
+        if self.is_saving:
+            raise Exception("Etl method 'save' can not be recalled")
         flag = None
         if len(args) == 1:
             for df in args[0]:
@@ -344,6 +336,7 @@ class Etl(object):
         """
         保存数据并记录最后更新的时间点
         """
+        self.is_saving = True
         if isinstance(self.dst_obj, str):
             if self.dst_tab=='csv':
                 df.to_csv(self.dst_obj, index=False)
@@ -373,9 +366,20 @@ class Etl(object):
                 else:
                     self.dst_obj.insert(sql, args, num=self._insert_count)
                     self.task.append()
+            self.df = df
             self.tearDown()
             self.dst_obj.commit()
+            self.task.commit()
         log.info('插入数量：%s' % len(df))
+
+    def save_df(self, df, table, unique):
+        args = self.df_to_dict(df)
+        self.dst_obj.merge(table, args, unique, num=self._insert_count)
+
+    def df_to_dict(self, df):
+        columns = list(df.columns)
+        args = [dict(zip(columns, i)) for i in df.values]
+        return args
 
     def after(self, func):
         self.tearDown = types.MethodType(func, self)
