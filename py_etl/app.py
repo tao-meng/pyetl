@@ -90,6 +90,7 @@ class Etl(object):
         return self._connect(src_uri), self._connect(dst_uri)
 
     def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
+        self.count = (0, 0, 0)
         self.is_config = False
         self.is_saving = False
         self.src_tab = src_tab
@@ -290,6 +291,7 @@ class Etl(object):
                 inplace=True)
             self.print('src data', src_df)
             self.print('src type', pandas.DataFrame(src_df.dtypes).T)
+            if self.update:
                 last_time = src_df[self.update].max()
                 self.last_time = max(self.last_time, last_time
                                      ) if self.last_time else last_time
@@ -351,26 +353,31 @@ class Etl(object):
             if self.last_time:
                 if self.job:
                     args = [dict(zip(columns, i)) for i in df.values]
-                    self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
+                    self._count = self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
                     self.task.update(self.last_time)
                 else:
                     args = list(map(tuple, df.values))
-                    self.dst_obj.insert(sql, args, num=self._insert_count)
+                    self._count = self.dst_obj.insert(sql, args, num=self._insert_count)
                     self.task.append(self.last_time)
             else:
                 args = list(map(tuple, df.values))
                 if self.unique:
                     args = [dict(zip(columns, i)) for i in df.values]
-                    self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
+                    self._count = self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
                     self.task.append()
                 else:
-                    self.dst_obj.insert(sql, args, num=self._insert_count)
+                    self._count = self.dst_obj.insert(sql, args, num=self._insert_count)
                     self.task.append()
             self.df = df
             self.tearDown()
             self.dst_obj.commit()
             self.task.commit()
-        log.info('插入数量：%s' % len(df))
+        total = len(df)
+        delta = total - self._count
+        self.count = total, self._count, delta
+        log.info('数据接入数量：%s' % self.count[0])
+        log.info('数据插入数量：%s' % self.count[1])
+        log.info('数据修改数量：%s' % self.count[2])
 
     def save_df(self, df, table, unique):
         args = self.df_to_dict(df)
