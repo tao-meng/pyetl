@@ -147,7 +147,7 @@ class Etl(object):
                 self.update = [
                     i.split(" as ") for i in self.src_field if self.update == i.split(" as ")[0].upper()
                 ][0][1]
-                print("update_name: ", self.update)
+                log.info("update field: %s" % self.update)
 
     def _gen_sql(self, where, groupby):
         """
@@ -235,6 +235,7 @@ class Etl(object):
         self.task = TaskConfig(self.src_tab, self.dst_tab)
         if self.update:
             self.job, self.last_time = self.task.query(days)
+            log.info("last time: %s" % self.last_time)
         else:
             self.job, self.last_time = None, None
         self.last = self.last_time
@@ -339,6 +340,7 @@ class Etl(object):
         保存数据并记录最后更新的时间点
         """
         self.is_saving = True
+        total = len(df)
         if isinstance(self.dst_obj, str):
             if self.dst_tab=='csv':
                 df.to_csv(self.dst_obj, index=False)
@@ -372,12 +374,12 @@ class Etl(object):
             self.tearDown()
             self.dst_obj.commit()
             self.task.commit()
-        total = len(df)
-        delta = total - self._count
-        self.count = total, self._count, delta
-        log.info('数据接入数量：%s' % self.count[0])
-        log.info('数据插入数量：%s' % self.count[1])
-        log.info('数据修改数量：%s' % self.count[2])
+            delta = total - self._count
+            self.count = total, self._count, delta
+            log.info('数据插入数量：%s' % self.count[1])
+            log.info('数据修改数量：%s' % self.count[2])
+        log.info('数据接入数量：%s' % total)
+
 
     def save_df(self, df, table, unique):
         args = self.df_to_dict(df)
