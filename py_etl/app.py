@@ -89,33 +89,20 @@ class Etl(object):
     def _create_obj(self, src_uri, dst_uri):
         return self._connect(src_uri), self._connect(dst_uri)
 
-    def __init__(self, src_tab, dst_tab, mapping, update=None, unique=None):
+    def __init__(self, src_tab, dst_tab, mapping=None, update=None, unique=None):
         self.count = (0, 0, 0)
         self.is_config = False
         self.is_saving = False
         self.src_tab = src_tab
         self.dst_tab = dst_tab
-        self.update = upper(update) if update else None
-        self.unique = upper(unique) if unique else None
-        self.src_mapping = {upper(i): j for i, j in mapping.items()}
-        self.mapping = {upper(i): upper(j) for i, j in mapping.items()}
+        self.update = upper(update) if update else ''
+        self.unique = upper(unique) if unique else ''
+        self.src_mapping = {upper(i): j for i, j in mapping.items()} if mapping else {}
+        self.mapping = {upper(i): upper(j) for i, j in mapping.items()} if mapping else {}
         self.funs = {}
-        if not (self.unique in self.mapping or ((set(self.unique) & set(self.mapping.keys())) == set(self.unique))):
+        if self.mapping and not (self.unique in self.mapping or ((set(self.unique) & set(self.mapping.keys())) == set(self.unique))):
             log.error("unique：%s 名称错误\nEXIT" % self.unique)
             sys.exit(1)
-        # if unique and update:
-        #     # unique = upper(unique)
-        #     if unique in self.mapping or ((set(unique) & set(self.mapping.keys())) == set(unique)):
-        #         self.unique = unique
-        #     else:
-        #         log.error("unique：%s 名称错误\nEXIT" % self.unique)
-        #         sys.exit(1)
-        # else:
-        #     self.unique = upper(unique) if unique else None
-        # if update:
-        #     self.update = upper(update)
-        # else:
-        #     self.update = None
 
     def _handle_field_name(self):
         """
@@ -156,6 +143,9 @@ class Etl(object):
         :param groupby: sql语句中group by分组条件
         :return: sql, args
         """
+        if not self.mapping:
+            self.src_field = ['*']
+            self.update_old = self.update
         sql = ["select {columns} from {src_tab}".format(
             columns=','.join(self.src_field), src_tab=self.src_tab)]
         args = []
@@ -245,7 +235,7 @@ class Etl(object):
         获取源数据
         """
         self._query_task_info(days)
-        self._handle_field_name()
+        self._handle_field_name() if self.mapping else None
         if isinstance(self.src_obj, str):
             if self.src_tab=='csv':
                 iter_df = pandas.read_csv(
@@ -287,6 +277,8 @@ class Etl(object):
                 column_upper = [self.src_field_dict[i].upper() for i in list(src_df.columns)]
             else:
                 column_upper = [i.upper() for i in list(src_df.columns)]
+                if not self.mapping:
+                    self.mapping = {i:i for i in column_upper}
             src_df.rename(
                 columns={i: j for i, j in zip(src_df.columns, column_upper)},
                 inplace=True)
@@ -353,7 +345,7 @@ class Etl(object):
                 self.dst_tab, ','.join(columns),
                 concat_place(columns, place=self._dst_place))
             if self.last_time:
-                if self.job:
+                if self.job and self.unique:
                     args = [dict(zip(columns, i)) for i in df.values]
                     self._count = self.dst_obj.merge(self.dst_tab, args, self.unique, num=self._insert_count)
                     self.task.update(self.last_time)

@@ -27,6 +27,13 @@ def task_oracle():
     app.config(config['oracle'])
     app.save(app.run(days=0, where="rownum<10"))
 
+def task_etl():
+    src_tab = 'py_etl_src'
+    dst_tab = 'py_etl'
+    app = Etl(src_tab, dst_tab, unique='id')
+    app.config(config['oracle'])
+    app.add('foo')(lambda x: x+'!')
+    app.save(app.run())
 
 def task_tofile():
     src_tab = 'py_etl_src'
@@ -43,7 +50,8 @@ def main():
     with env_config():
         task_fromfile()
         task_oracle()
-        task_tofile()
+        task_etl()
+        # task_tofile()
 
 
 if __name__ == '__main__':
