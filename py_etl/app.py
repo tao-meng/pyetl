@@ -91,10 +91,12 @@ class Etl(object):
 
     def __init__(self, src_tab, dst_tab, mapping=None, update=None, unique=None):
         self.count = (0, 0, 0)
+        self._total = 0
         self.is_config = False
         self.is_saving = False
         self.src_tab = src_tab
         self.dst_tab = dst_tab
+        log.info('start update table: %s' % dst_tab)
         self.update = upper(update) if update else ''
         self.unique = upper(unique) if unique else ''
         self.src_mapping = {upper(i): j for i, j in mapping.items()} if mapping else {}
@@ -134,7 +136,12 @@ class Etl(object):
                 self.update = [
                     i.split(" as ") for i in self.src_field if self.update == i.split(" as ")[0].upper()
                 ][0][1]
-                log.info("update field: %s" % self.update)
+                if self.update_old != upper(self.src_mapping[self.update]):
+                    log.error(
+                        "update field check failed(src: %s, new: %s)\nEXIT"
+                        % (self.update_old, self.update)
+                    )
+                    sys.exit(1)
 
     def _gen_sql(self, where, groupby):
         """
@@ -172,26 +179,27 @@ class Etl(object):
         :return: handled dataframe by function added
         """
         data = {}
+        funs = self.funs.copy()
         for i, j in self.mapping.items():
             if isinstance(j, (list, tuple)):
                 merged_array = map(list, zip(*[src_df[x] for x in j]))
-                if i in self.funs:
-                    data[i] = pandas.Series(merged_array).map(self.funs[i]).astype('object')
-                    self.funs.pop(i)
+                if i in funs:
+                    data[i] = pandas.Series(merged_array).map(funs[i]).astype('object')
+                    funs.pop(i)
                 else:
                     log.error("'{}'字段是一个列表需要添加处理函数\nEXIT".format(i))
                     sys.exit(1)
             else:
-                if i in self.funs:
-                    data[i] = src_df[i].map(self.funs[i]).astype('object')
-                    self.funs.pop(i)
+                if i in funs:
+                    data[i] = src_df[i].map(funs[i]).astype('object')
+                    funs.pop(i)
                 else:
                     data[i] = src_df[i].astype('object')
-        for i in self.funs:
+        for i in funs:
             cols = list(i)
             if (isinstance(i, (tuple, list)) and
                     (set(cols) & set(self.mapping.keys()) == set(cols))):
-                tmp_df = src_df[cols].apply(_change(self.funs[i]), axis=1)
+                tmp_df = src_df[cols].apply(_change(funs[i]), axis=1)
                 for idx, col in enumerate(cols):
                     data[col] = tmp_df[idx].astype('object')
             else:
@@ -326,6 +334,9 @@ class Etl(object):
                 rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 new_args = (rs,) + args[2:]
                 self.join(*new_args, on=on)
+        log.info('数据接入数量：%s' % self.count[0])
+        log.info('数据插入数量：%s' % self.count[1])
+        log.info('数据修改数量：%s' % self.count[2])
 
     def _save_df(self, df):
         """
@@ -336,6 +347,8 @@ class Etl(object):
         if isinstance(self.dst_obj, str):
             if self.dst_tab=='csv':
                 df.to_csv(self.dst_obj, index=False)
+                tmp_count = total, total, 0
+                self.count = [tmp_count[i]+self.count[i] for i in [0,1,2]]
             else:
                 log.error("文件类型'{}'不支持".format(self.dst_tab))
                 sys.exit()
@@ -367,10 +380,9 @@ class Etl(object):
             self.dst_obj.commit()
             self.task.commit()
             delta = total - self._count
-            self.count = total, self._count, delta
-            log.info('数据插入数量：%s' % self.count[1])
-            log.info('数据修改数量：%s' % self.count[2])
-        log.info('数据接入数量：%s' % total)
+            tmp_count = total, self._count, delta
+            self.count = [tmp_count[i]+self.count[i] for i in [0,1,2]]
+
 
 
     def save_df(self, df, table, unique):

@@ -13,6 +13,7 @@ class TestingConfig:
 
 class TestoracleConfig:
     DEBUG = True
+    QUERY_COUNT = 200
     SRC_URI = {"uri": "oracle://jwdn:jwdn@local:1521/xe", "debug": True}
     DST_URI = {"uri": "oracle://jwdn:jwdn@local:1521/xe", "debug": False}
 
