@@ -334,9 +334,9 @@ class Etl(object):
                 rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 new_args = (rs,) + args[2:]
                 self.join(*new_args, on=on)
-        log.info('数据接入数量：%s' % self.count[0])
-        log.info('数据插入数量：%s' % self.count[1])
-        log.info('数据修改数量：%s' % self.count[2])
+        log.info('总数据接入数量：%s' % self.count[0])
+        log.info('总数据插入数量：%s' % self.count[1])
+        log.info('总数据修改数量：%s' % self.count[2])
 
     def _save_df(self, df):
         """
@@ -381,6 +381,7 @@ class Etl(object):
             self.task.commit()
             delta = total - self._count
             tmp_count = total, self._count, delta
+            log.info('单次接入: %s, %s, %s' % tmp_count)
             self.count = [tmp_count[i]+self.count[i] for i in [0,1,2]]
 
 
