@@ -68,6 +68,11 @@ class Etl(object):
         return decorator
 
     def _connect(self, uri):
+        '''
+        创建数据源操作对象，数据库类型引用pydbc
+        :param uri: 对象连接窜example(文件类型：'/home/etl/training.csv'， 数据库类型："oracle://jwdn:jwdn@local:1521/xe")
+        :return: 对应数据操作对象
+        '''
         if isinstance(uri, str):
             return connection(uri, debug=self._debug)
         elif isinstance(uri, dict):
@@ -96,6 +101,8 @@ class Etl(object):
         self.is_saving = False
         self.src_tab = src_tab
         self.dst_tab = dst_tab
+        self._setUp = []
+        self._tearDown = []
         log.info('start update table: %s' % dst_tab)
         self.update = upper(update) if update else ''
         self.unique = upper(unique) if unique else ''
@@ -278,7 +285,8 @@ class Etl(object):
         if not self.is_config:
             log.error('需要先加载配置文件\nEXIT')
             sys.exit(1)
-        self.setUp()
+        for func, param in self._setUp:
+            func(param)
         iter_df = self._gen_df_from_source(where, groupby, days)
         for src_df in iter_df:
             if isinstance(self.src_obj, str):
@@ -328,12 +336,12 @@ class Etl(object):
                 sys.exit()
             args = map(next, args) if isinstance(args[0], Iterator) else args
             if len(args) == 2:
-                rs = pandas.merge(*args, on=on, how='outer')
+                rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 self._save_df(rs)
             else:
                 rs = pandas.merge(args[0], args[1], on=on, how='outer')
                 new_args = (rs,) + args[2:]
-                self.join(*new_args, on=on)
+                self.save(*new_args, on=on)
         log.info('总数据接入数量：%s' % self.count[0])
         log.info('总数据插入数量：%s' % self.count[1])
         log.info('总数据修改数量：%s' % self.count[2])
@@ -376,7 +384,8 @@ class Etl(object):
                     self._count = self.dst_obj.insert(sql, args, num=self._insert_count)
                     self.task.append()
             self.df = df
-            self.tearDown()
+            for func, param in self._tearDown:
+                func(param)
             self.dst_obj.commit()
             self.task.commit()
             delta = total - self._count
@@ -396,13 +405,15 @@ class Etl(object):
         return args
 
     def after(self, func):
-        self.tearDown = types.MethodType(func, self)
+        # self.tearDown = types.MethodType(func, self)
+        self._tearDown.append((func, self))
 
     def before(self, func):
-        self.setUp = types.MethodType(func, self)
+        # self.setUp = types.MethodType(func, self)
+        self._setUp.append((func, self))
 
-    def setUp(self):
-        pass
+    # def setUp(self):
+    #     pass
 
-    def tearDown(self):
-        pass
+    # def tearDown(self):
+    #     pass
