@@ -8,9 +8,10 @@
     app = Etl('src_table', 'dst_table', unique='id')
     app.config(TestOracleConfig)
     @app.add('id')
-    def foo(x):
+    def udf(x):
         return x.upper()
     @app.after
-    def clear(app):
+    def clearup(app):
+        print(app.dst.query("select count(*) from dst_table"))
         app.src.empty('src_table')
-    app.save(app.run())
+    app.save(app.run(where="rownum<10"))
