@@ -4,7 +4,7 @@ sys.path.insert(
     0,
     os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 )
-from py_etl import Etl
+from pyetl import Etl
 
 
 def eng_test():

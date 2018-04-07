@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 if __name__ == "__main__":
     from logger import log
 else:
-    from py_etl.logger import log
+    from pyetl.logger import log
 
 
 class ObjEncoder(json.JSONEncoder):

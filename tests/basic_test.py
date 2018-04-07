@@ -6,7 +6,7 @@ from env_config import env_config
 
 def task_fromfile():
     src_tab = 'csv'
-    dst_tab = 'py_etl_src'
+    dst_tab = 'pyetl_src'
     dst_unique = 'id'
     mapping = {'id': 'id', 'foo': 'foo', 'date_time': 'date_time',
                'x': 'x', 'y': 'y'}
@@ -17,9 +17,9 @@ def task_fromfile():
 
 
 def task_oracle():
-    src_tab = 'py_etl_src'
+    src_tab = 'pyetl_src'
     src_update = 'date_time'
-    dst_tab = 'py_etl_dst'
+    dst_tab = 'pyetl_dst'
     dst_unique = 'id'
     mapping = {'id': 'id', 'bar': 'foo', 'update_time': 'date_time',
                'lon': 'x', 'lat': 'y'}
@@ -34,8 +34,8 @@ def setup(app):
     print(rs)
 
 def task_etl():
-    src_tab = 'py_etl_src'
-    dst_tab = 'py_etl_src'
+    src_tab = 'pyetl_src'
+    dst_tab = 'pyetl_src'
     app = Etl(src_tab, dst_tab, unique='id')
     app.config(config['oracle'])
     app.before(setup)
@@ -43,7 +43,7 @@ def task_etl():
     app.run()
 
 def task_tofile():
-    src_tab = 'py_etl_src'
+    src_tab = 'pyetl_src'
     dst_tab = 'csv'
     dst_unique = 'id'
     mapping = {'id': 'id', 'bar': 'foo', 'update_time': 'date_time',
@@ -58,7 +58,7 @@ def main():
         task_fromfile()
         task_oracle()
         task_etl()
-        import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
         task_tofile()
 
 

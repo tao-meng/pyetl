@@ -20,14 +20,14 @@ class TestoracleConfig:
 
 class TestFromfileConfig:
     DEBUG = True
-    SRC_URI = {'file': 'PY_ETL_SRC.csv'}
+    SRC_URI = {'file': 'pyetl_src.csv'}
     DST_URI = "oracle://jwdn:jwdn@local:1521/xe"
 
 
 class TestTofileConfig:
     DEBUG = True
     SRC_URI = "oracle://jwdn:jwdn@local:1521/xe"
-    DST_URI = {'file': 'PY_ETL.csv'}
+    DST_URI = {'file': 'pyetl.csv'}
 
 
 class DevelopmentConfig:

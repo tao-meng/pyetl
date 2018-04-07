@@ -6,8 +6,8 @@ import pandas
 import functools
 import time
 import logging
-from py_etl.db import connection
-from py_etl.mylogger import log
+from pyetl.db import connection
+from pyetl.mylogger import log
 
 
 def print(*args, notice=''):

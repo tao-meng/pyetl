@@ -9,7 +9,7 @@ formatter = logging.Formatter(
     '%Y-%m-%d %H:%M:%S'
 )
 console.setFormatter(formatter)
-log = logging.getLogger('py_etl')
+log = logging.getLogger('pyetl')
 log.addHandler(console)
 log.setLevel(logging.INFO)
 

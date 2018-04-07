@@ -1,6 +1,6 @@
 ## python etl frame
 
-    from py_etl import Etl
+    from pyetl import Etl
     class TestOracleConfig:
         DST_URI = SRC_URI = {"uri": "oracle://lyt:lyt@local:1521/xe"}
 

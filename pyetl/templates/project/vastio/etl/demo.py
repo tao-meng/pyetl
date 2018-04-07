@@ -1,4 +1,4 @@
-from py_etl import Etl
+from pyetl import Etl
 from vastio.config import default
 from vastio.lib import get_args
 from vastio.logger import module_log

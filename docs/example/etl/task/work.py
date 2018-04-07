@@ -1,4 +1,4 @@
-from py_etl import Etl
+from pyetl import Etl
 from etl.config import default
 
 

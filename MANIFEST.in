@@ -1,2 +1,2 @@
-recursive-include py_etl/templates *
+recursive-include pyetl/templates *
 

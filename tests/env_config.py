@@ -15,14 +15,14 @@ def concat_place(field, place=":1"):
 def env_config():
     db = connection(**config['default'].SRC_URI)
     db.insert("""
-create table py_etl_src(
+create table pyetl_src(
     id varchar(32) primary key,
     foo varchar(100),
     date_time date,
     x number(9,6),
     y number(9,6))""")
     db.insert("""
-create table py_etl_dst(
+create table pyetl_dst(
     id varchar(32),
     bar varchar(100),
     update_time date,
@@ -32,8 +32,8 @@ create table py_etl_dst(
     try:
         yield
     finally:
-        db.insert("drop table py_etl_src")
-        db.insert("drop table py_etl_dst")
+        db.insert("drop table pyetl_src")
+        db.insert("drop table pyetl_dst")
 
 
 if __name__=="__main__":

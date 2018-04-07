@@ -5,9 +5,9 @@ import pandas
 import types
 import sys
 import logging
-from py_etl.logger import log
-from py_etl.utils import run_time, concat_place
-from py_etl.task import TaskConfig
+from pyetl.logger import log
+from pyetl.utils import run_time, concat_place
+from pyetl.task import TaskConfig
 # pandas.set_option('display.height', 1000)
 # pandas.set_option('display.max_rows', 500)
 pandas.set_option('display.max_columns', 500)

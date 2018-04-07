@@ -2,8 +2,8 @@
 from pydbclib import connection
 from dateutil.parser import parse
 import datetime
-from py_etl.utils import dtutil
-from py_etl.logger import log
+from pyetl.utils import dtutil
+from pyetl.logger import log
 import re
 
 
