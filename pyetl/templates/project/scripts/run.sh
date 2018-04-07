@@ -7,6 +7,5 @@ home=`pwd`
 # echo $home
 export PYTHONPATH=$home
 source /etc/profile
-source /root/.bashrc
 
-python3 ./vastio/etl/demo.py
+python3 ./app/etl/job.py
