@@ -1,4 +1,4 @@
-## python etl frame
+## python etl frame for small dataset
 
     from pyetl import Etl
     class TestOracleConfig:
@@ -22,3 +22,6 @@
         app.dst.empty('src_table')
 
     app.run(where="rownum<10") # 数据源过滤
+
+### 关于Config
+    数据库源按[pydbclib](https://github.com/taogeYT/pydbclib)配置标准

@@ -15,7 +15,7 @@ setup(
         'pandas>=0.19.0',
         'sqlalchemy>=1.1.4',
         'python-dateutil>=2.5.0'],
-    description='python etl frame',
+    description='python etl frame for small dataset',
     classifiers=[
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',

@@ -3,7 +3,7 @@
 __author__ = "lyt"
 
 """
-    A python etl frame based on pandas and sqlalchemy
+    python etl frame based on pandas for small dataset
 """
 __version__ = '2.2.1'
 
