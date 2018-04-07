@@ -14,4 +14,4 @@
     def clearup(app):
         print(app.dst.query("select count(*) from dst_table"))
         app.src.empty('src_table')
-    app.save(app.run(where="rownum<10"))
+    app.run(where="rownum<10")
