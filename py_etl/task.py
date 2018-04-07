@@ -1,4 +1,5 @@
-from py_db import connection
+# from py_db import connection
+from pydbclib import connection
 from dateutil.parser import parse
 import datetime
 from py_etl.utils import dtutil

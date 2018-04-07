@@ -13,7 +13,7 @@ def task_fromfile():
     app = Etl(src_tab, dst_tab, mapping, unique=dst_unique)
     app.config(config['fromfile'])
     app.add('date_time')(lambda x: parser.parse(x) if x else None)
-    app.save(app.run(days=0, where="rownum<10"))
+    app.run(days=0, where="rownum<10")
 
 
 def task_oracle():
@@ -25,15 +25,22 @@ def task_oracle():
                'lon': 'x', 'lat': 'y'}
     app = Etl(src_tab, dst_tab, mapping, update=src_update, unique=dst_unique)
     app.config(config['oracle'])
-    app.save(app.run(days=0, where="rownum<10"))
+    app.run(days=0, where="rownum<10")
+
+def setup(app):
+    sql = "delete from %s" % app.dst_tab
+    print(sql)
+    rs = app.dst.insert(sql)
+    print(rs)
 
 def task_etl():
     src_tab = 'py_etl_src'
-    dst_tab = 'py_etl'
+    dst_tab = 'py_etl_src'
     app = Etl(src_tab, dst_tab, unique='id')
     app.config(config['oracle'])
+    app.before(setup)
     app.add('foo')(lambda x: x+'!')
-    app.save(app.run())
+    app.run()
 
 def task_tofile():
     src_tab = 'py_etl_src'
@@ -43,7 +50,7 @@ def task_tofile():
                'lon': 'x', 'lat': 'y'}
     app = Etl(src_tab, dst_tab, mapping, unique=dst_unique)
     app.config(config['tofile'])
-    app.save(app.run(days=0, where="rownum<10"))
+    app.run(days=0, where="rownum<10")
 
 
 def main():
@@ -51,7 +58,8 @@ def main():
         task_fromfile()
         task_oracle()
         task_etl()
-        # task_tofile()
+        import pdb;pdb.set_trace()
+        task_tofile()
 
 
 if __name__ == '__main__':

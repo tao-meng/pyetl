@@ -1,5 +1,6 @@
 from collections import Iterator
-from py_db import connection
+# from py_db import connection
+from pydbclib import connection
 import pandas
 import types
 import sys
@@ -276,6 +277,9 @@ class Etl(object):
             log.debug("%s\n%s" % (descr, df[:5]))
 
     def run(self, where=None, groupby=None, days=None):
+        self.save(self.transform(where, groupby, days))
+
+    def transform(self, where=None, groupby=None, days=None):
         """
         数据处理任务执行
         :param where: 查询sql的过滤条件 example: where="id is not null"
