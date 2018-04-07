@@ -24,4 +24,4 @@
     app.run(where="rownum<10") # 数据源过滤
 
 ### 关于Config
-    数据库源按[pydbclib](https://github.com/taogeYT/pydbclib)配置标准
+数据库源按[pydbclib](https://github.com/taogeYT/pydbclib)配置标准
